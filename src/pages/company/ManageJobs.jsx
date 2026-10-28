@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fi';
 
 export default function ManageJobs() {
-    const { currentUser } = useAuth();
+    const { currentUser, userData } = useAuth();
     const navigate = useNavigate();
 
     const [jobs, setJobs] = useState([]);
@@ -26,11 +26,17 @@ export default function ManageJobs() {
             loadData();
             loadQuota();
         }
-    }, [currentUser]);
+    }, [currentUser, userData]);
 
     async function loadQuota() {
         try {
-            const token = localStorage.getItem('mock_current_session') ? JSON.parse(localStorage.getItem('mock_current_session')).token : null;
+            let token = localStorage.getItem('token');
+            if (!token) {
+                try {
+                    token = JSON.parse(localStorage.getItem('mock_current_session') || '{}')?.token;
+                } catch (e) {}
+            }
+            if (!token) return;
             const res = await fetch('http://localhost:5000/api/subscriptions/employer-quota', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -43,11 +49,29 @@ export default function ManageJobs() {
 
     async function loadData() {
         try {
+            const companyId = userData?.company_id || userData?.companyId || currentUser?.uid;
+            const companyName = userData?.companyName || userData?.name || '';
             const [data, apps] = await Promise.all([
-                getJobsByCompany(currentUser.uid),
-                getApplicationsByCompany(currentUser.uid)
+                getJobsByCompany(companyId, companyName),
+                getApplicationsByCompany(companyId, companyName)
             ]);
-            setJobs(data || []);
+
+            // Strict double-layer isolation: filter jobs strictly belonging to this company
+            const currentCompNameLower = companyName.toLowerCase().trim();
+            const currentCompId = String(companyId || '').trim();
+
+            const scopedJobs = (data || []).filter(j => {
+                if (!currentCompNameLower && !currentCompId) return true;
+                const jCompName = (j.company_name || j.companyName || '').toLowerCase().trim();
+                const jCompId = String(j.company_id || j.companyId || '').trim();
+                const jEmpId = String(j.employer_id || j.employerId || '').trim();
+                
+                const matchesName = Boolean(currentCompNameLower && jCompName && (jCompName === currentCompNameLower));
+                const matchesId = Boolean(currentCompId && (jCompId === currentCompId || jEmpId === currentCompId));
+                return matchesName || matchesId;
+            });
+
+            setJobs(scopedJobs);
             setApplications(apps || []);
         } catch (err) {
             console.error(err);
@@ -59,19 +83,27 @@ export default function ManageJobs() {
         try {
             await updateJobStatus(jobId, newStatus);
             setJobs(prev => prev.map(j => (j.id === jobId || j.jobId === jobId || j.job_id === jobId) ? { ...j, status: newStatus, jobStatus: newStatus } : j));
+            await loadQuota();
         } catch (err) {
             console.error(err);
         }
     }
 
     async function handleDuplicate(jobId) {
+        if (quotaData && !quotaData.canPostMore) {
+            alert(`Free limit reached! You have used ${quotaData.postedCount} of ${quotaData.allowedLimit} allowed jobs. Please upgrade your subscription plan to post or duplicate more jobs.`);
+            navigate('/company/subscriptions');
+            return;
+        }
         try {
             const newId = await duplicateJob(jobId);
             if (newId) {
                 await loadData();
+                await loadQuota();
             }
         } catch (err) {
             console.error(err);
+            alert(err.message || 'Failed to duplicate job. Quota limit may be reached.');
         }
     }
 
@@ -80,6 +112,7 @@ export default function ManageJobs() {
             await deleteJob(jobId);
             setJobs(prev => prev.filter(j => j.id !== jobId && j.jobId !== jobId && j.job_id !== jobId));
             setDeleteModal(null);
+            await loadQuota();
         } catch (err) {
             console.error(err);
         }
@@ -105,9 +138,15 @@ export default function ManageJobs() {
                         <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Manage Job Postings</h1>
                         <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: '0.92rem' }}>Manage job statuses, duplicate postings, and track applications</p>
                     </div>
-                    <Link to="/company/post-job" className="btn btn-primary" style={{ padding: '12px 24px', fontWeight: 800 }}>
-                        <FiPlus /> + Post a Job
-                    </Link>
+                    {quotaData && !quotaData.canPostMore ? (
+                        <Link to="/company/subscriptions" className="btn btn-primary" style={{ padding: '12px 24px', fontWeight: 800, background: '#dc2626', borderColor: '#dc2626' }}>
+                            ⚡ Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                        </Link>
+                    ) : (
+                        <Link to="/company/post-job" className="btn btn-primary" style={{ padding: '12px 24px', fontWeight: 800 }}>
+                            <FiPlus /> + Post a Job
+                        </Link>
+                    )}
                 </div>
 
                 {/* Quota Widget */}

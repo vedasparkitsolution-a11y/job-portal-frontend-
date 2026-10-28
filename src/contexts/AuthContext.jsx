@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 import { 
     signInWithGoogle, 
     firebaseSignInEmailPassword, 
@@ -127,6 +128,9 @@ export function AuthProvider({ children }) {
                     setUserData(session.data);
                     setUserRole(session.role);
                     setToken(session.token);
+                    if (session.token) {
+                        localStorage.setItem('token', session.token);
+                    }
                 }
             }
         } catch (err) {
@@ -136,6 +140,12 @@ export function AuthProvider({ children }) {
             setLoading(false);
         }
     }, []);
+
+    useEffect(() => {
+        if (token) {
+            localStorage.setItem('token', token);
+        }
+    }, [token]);
 
     async function refreshUserData() {
         const session = JSON.parse(localStorage.getItem('mock_current_session') || 'null');
@@ -157,7 +167,7 @@ export function AuthProvider({ children }) {
         let realToken = null;
         let realUser = null;
         try {
-            const res = await fetch('http://localhost:5000/api/auth/login', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -185,6 +195,7 @@ export function AuthProvider({ children }) {
             setUserData(data);
             setUserRole(realUser.role);
             setToken(realToken);
+            localStorage.setItem('token', realToken);
             localStorage.setItem('mock_current_session', JSON.stringify(session));
             return { user: { uid: realUser.id, email: realUser.email, role: realUser.role } };
         }
@@ -250,7 +261,7 @@ export function AuthProvider({ children }) {
 
     async function sendOtp(phone, countryCode = '+91') {
         try {
-            const res = await fetch('http://localhost:5000/api/auth/send-otp', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone, countryCode })
@@ -272,7 +283,7 @@ export function AuthProvider({ children }) {
 
     async function verifyOtp(phone, otp) {
         try {
-            const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone, otp })
@@ -334,7 +345,7 @@ export function AuthProvider({ children }) {
 
     async function employerLogin(email, password) {
         try {
-            const res = await fetch('http://localhost:5000/api/auth/employer/login', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/employer/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -352,6 +363,9 @@ export function AuthProvider({ children }) {
                 setUserData(data.user);
                 setUserRole('company');
                 setToken(data.token);
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
                 localStorage.setItem('mock_current_session', JSON.stringify(session));
                 return data;
             }
@@ -388,7 +402,7 @@ export function AuthProvider({ children }) {
         }
 
         try {
-            const res = await fetch('http://localhost:5000/api/candidate/google', {
+            const res = await fetch(`${API_BASE_URL}/api/candidate/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(googleUser)
@@ -461,7 +475,7 @@ export function AuthProvider({ children }) {
         }
 
         try {
-            const res = await fetch('http://localhost:5000/api/auth/employer/google-login', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/employer/google-login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(googleAccount)
@@ -512,7 +526,7 @@ function safeSetLocalStorage(key, value) {
     async function createCompanyProfile(profileData) {
         let result = null;
         try {
-            const res = await fetch('http://localhost:5000/api/auth/employer/create-profile', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/employer/create-profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profileData)
@@ -594,19 +608,25 @@ function safeSetLocalStorage(key, value) {
             createdAt: new Date().toISOString()
         };
 
-        const session = { uid, email, role: 'jobseeker', data: sessionData, token: null };
+        const candidateToken = profileData.token || `cand_tok_${uid}_${Date.now()}`;
+        const session = { uid, email, role: 'jobseeker', data: sessionData, token: candidateToken };
 
         // Save to mock_auth_users for future logins
         const users = JSON.parse(localStorage.getItem('mock_auth_users') || '{}');
-        if (!users[email]) {
-            users[email] = { uid, email, password: 'otp_verified', role: 'jobseeker', data: sessionData };
-            safeSetLocalStorage('mock_auth_users', users);
-        }
+        users[email] = { 
+            uid, 
+            email, 
+            password: profileData.password || users[email]?.password || 'password', 
+            role: 'jobseeker', 
+            data: sessionData 
+        };
+        safeSetLocalStorage('mock_auth_users', users);
 
         setCurrentUser({ uid, email });
         setUserData(sessionData);
         setUserRole('jobseeker');
-        setToken(null);
+        setToken(candidateToken);
+        localStorage.setItem('token', candidateToken);
         safeSetLocalStorage('mock_current_session', session);
 
         return { success: true, uid };
@@ -623,6 +643,7 @@ function safeSetLocalStorage(key, value) {
         setUserRole(null);
         setToken(null);
         setVerifiedMobile('');
+        localStorage.removeItem('token');
         localStorage.removeItem('mock_current_session');
         localStorage.removeItem('employer_verified_mobile');
         sessionStorage.removeItem('verified_candidate_phone');

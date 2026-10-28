@@ -86,11 +86,22 @@ const Step1Profile = ({ formData, setFormData }) => {
                     <label style={labelStyle}>Phone Number</label>
                     <input
                         type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]{10}"
+                        maxLength={10}
                         name="phone"
                         value={formData.phone}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setFormData('phone', val);
+                        }}
+                        onKeyDown={(e) => {
+                            if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) return;
+                            if (e.ctrlKey || e.metaKey) return;
+                            if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                        }}
                         style={inputStyle}
-                        placeholder="Enter your phone number"
+                        placeholder="9876543210"
                     />
                 </div>
 

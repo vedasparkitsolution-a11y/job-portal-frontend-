@@ -4,8 +4,64 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
     FiBriefcase, FiUser, FiMail, FiPhone, FiGlobe, 
     FiMapPin, FiUploadCloud, FiCheckCircle, FiLock, 
-    FiAlertCircle, FiImage, FiTrash2, FiFileText
+    FiAlertCircle, FiImage, FiTrash2, FiFileText, FiChevronDown
 } from 'react-icons/fi';
+
+const selectStyle = {
+    width: '100%',
+    padding: '12px 36px 12px 14px',
+    borderRadius: '12px',
+    border: '1.5px solid #cbd5e1',
+    fontSize: '0.95rem',
+    fontWeight: 600,
+    background: '#ffffff',
+    color: '#1e293b',
+    outline: 'none',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    cursor: 'pointer',
+    boxSizing: 'border-box'
+};
+
+const INDIAN_STATES = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Andaman and Nicobar Islands',
+    'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Jammu and Kashmir',
+    'Ladakh',
+    'Lakshadweep',
+    'Puducherry'
+];
 
 export default function CreateCompanyProfile() {
     const navigate = useNavigate();
@@ -72,7 +128,26 @@ export default function CreateCompanyProfile() {
     // Field change handler
     function handleChange(e) {
         const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        let finalVal = value;
+        if (name === 'companyPhone' || name === 'alternatePhone') {
+            const hasPlus = value.startsWith('+');
+            const digitsOnly = value.replace(/\D/g, '');
+            // When starting with country code 91 (e.g. +91 or 91), limit to 12 digits (2 prefix + 10 phone number)
+            // Otherwise limit to 10 digits
+            const maxDigits = digitsOnly.startsWith('91') ? 12 : 10;
+            const truncatedDigits = digitsOnly.slice(0, maxDigits);
+
+            if (hasPlus) {
+                if (value.startsWith('+91 ') && truncatedDigits.startsWith('91')) {
+                    finalVal = '+91 ' + truncatedDigits.slice(2);
+                } else {
+                    finalVal = '+' + truncatedDigits;
+                }
+            } else {
+                finalVal = truncatedDigits;
+            }
+        }
+        setFormData({ ...formData, [name]: finalVal });
         if (errors[name]) {
             setErrors({ ...errors, [name]: '' });
         }
@@ -425,9 +500,17 @@ export default function CreateCompanyProfile() {
                                 </label>
                                 <input 
                                     name="companyPhone"
+                                    type="tel"
+                                    inputMode="tel"
+                                    maxLength={15}
                                     value={formData.companyPhone}
                                     onChange={handleChange}
-                                    placeholder="Enter company phone number"
+                                    onKeyDown={(e) => {
+                                        if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) return;
+                                        if (e.ctrlKey || e.metaKey) return;
+                                        if (!/^[0-9+ ]$/.test(e.key)) e.preventDefault();
+                                    }}
+                                    placeholder="e.g. +91 9876543210"
                                     style={{
                                         width: '100%', padding: '12px', borderRadius: '12px',
                                         border: '1.5px solid #cbd5e1', fontSize: '0.95rem', fontWeight: 600, outline: 'none'
@@ -441,61 +524,70 @@ export default function CreateCompanyProfile() {
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                                     Company Type
                                 </label>
-                                <select 
-                                    name="companyType"
-                                    value={formData.companyType}
-                                    onChange={handleChange}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600, background: 'white' }}
-                                >
-                                    <option value="Private Limited">Private Limited</option>
-                                    <option value="Public Limited">Public Limited</option>
-                                    <option value="Partnership">Partnership</option>
-                                    <option value="Sole Proprietorship">Sole Proprietorship</option>
-                                    <option value="Startup">Startup</option>
-                                    <option value="MNC">MNC</option>
-                                    <option value="NGO">NGO</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <div style={{ position: 'relative' }}>
+                                    <select 
+                                        name="companyType"
+                                        value={formData.companyType}
+                                        onChange={handleChange}
+                                        style={selectStyle}
+                                    >
+                                        <option value="Private Limited">Private Limited</option>
+                                        <option value="Public Limited">Public Limited</option>
+                                        <option value="Partnership">Partnership</option>
+                                        <option value="Sole Proprietorship">Sole Proprietorship</option>
+                                        <option value="Startup">Startup</option>
+                                        <option value="MNC">MNC</option>
+                                        <option value="NGO">NGO</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                </div>
                             </div>
 
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                                     Industry
                                 </label>
-                                <select 
-                                    name="industry"
-                                    value={formData.industry}
-                                    onChange={handleChange}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600, background: 'white' }}
-                                >
-                                    <option value="IT/Software">IT / Software</option>
-                                    <option value="Finance">Finance / Fintech</option>
-                                    <option value="Healthcare">Healthcare / Pharma</option>
-                                    <option value="E-commerce">E-commerce / Retail</option>
-                                    <option value="Education">Education / EdTech</option>
-                                    <option value="Manufacturing">Manufacturing</option>
-                                    <option value="Marketing">Marketing / Agency</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <div style={{ position: 'relative' }}>
+                                    <select 
+                                        name="industry"
+                                        value={formData.industry}
+                                        onChange={handleChange}
+                                        style={selectStyle}
+                                    >
+                                        <option value="IT/Software">IT / Software</option>
+                                        <option value="Finance">Finance / Fintech</option>
+                                        <option value="Healthcare">Healthcare / Pharma</option>
+                                        <option value="E-commerce">E-commerce / Retail</option>
+                                        <option value="Education">Education / EdTech</option>
+                                        <option value="Manufacturing">Manufacturing</option>
+                                        <option value="Marketing">Marketing / Agency</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                </div>
                             </div>
 
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                                     Company Size
                                 </label>
-                                <select 
-                                    name="companySize"
-                                    value={formData.companySize}
-                                    onChange={handleChange}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600, background: 'white' }}
-                                >
-                                    <option value="1-10">1-10 Employees</option>
-                                    <option value="11-50">11-50 Employees</option>
-                                    <option value="51-200">51-200 Employees</option>
-                                    <option value="201-500">201-500 Employees</option>
-                                    <option value="501-1000">501-1000 Employees</option>
-                                    <option value="1000+">1000+ Employees</option>
-                                </select>
+                                <div style={{ position: 'relative' }}>
+                                    <select 
+                                        name="companySize"
+                                        value={formData.companySize}
+                                        onChange={handleChange}
+                                        style={selectStyle}
+                                    >
+                                        <option value="1-10">1-10 Employees</option>
+                                        <option value="11-50">11-50 Employees</option>
+                                        <option value="51-200">51-200 Employees</option>
+                                        <option value="201-500">201-500 Employees</option>
+                                        <option value="501-1000">501-1000 Employees</option>
+                                        <option value="1000+">1000+ Employees</option>
+                                    </select>
+                                    <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                </div>
                             </div>
 
                             <div>
@@ -577,20 +669,33 @@ export default function CreateCompanyProfile() {
                                     value={formData.city}
                                     onChange={handleChange}
                                     placeholder="Enter city"
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600 }}
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', fontWeight: 600, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }}
                                 />
                             </div>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                                     State
                                 </label>
-                                <input 
-                                    name="state"
-                                    value={formData.state}
-                                    onChange={handleChange}
-                                    placeholder="Enter state"
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600 }}
-                                />
+                                <div style={{ position: 'relative' }}>
+                                    <select 
+                                        name="state"
+                                        value={formData.state}
+                                        onChange={handleChange}
+                                        style={{ 
+                                            ...selectStyle,
+                                            color: formData.state ? '#1e293b' : '#94a3b8'
+                                        }}
+                                    >
+                                        <option value="" style={{ color: '#94a3b8' }}>Select State</option>
+                                        {INDIAN_STATES.map((st) => (
+                                            <option key={st} value={st} style={{ color: '#1e293b' }}>{st}</option>
+                                        ))}
+                                        {formData.state && !INDIAN_STATES.includes(formData.state) && (
+                                            <option value={formData.state} style={{ color: '#1e293b' }}>{formData.state}</option>
+                                        )}
+                                    </select>
+                                    <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                </div>
                             </div>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
@@ -601,7 +706,7 @@ export default function CreateCompanyProfile() {
                                     value={formData.country}
                                     onChange={handleChange}
                                     placeholder="Enter country"
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600 }}
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', fontWeight: 600, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }}
                                 />
                             </div>
                             <div>
@@ -613,7 +718,7 @@ export default function CreateCompanyProfile() {
                                     value={formData.pincode}
                                     onChange={handleChange}
                                     placeholder="Enter pincode"
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600 }}
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.95rem', fontWeight: 600, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }}
                                 />
                             </div>
                         </div>
@@ -712,9 +817,17 @@ export default function CreateCompanyProfile() {
                                 </label>
                                 <input 
                                     name="alternatePhone"
+                                    type="tel"
+                                    inputMode="tel"
+                                    maxLength={15}
                                     value={formData.alternatePhone}
                                     onChange={handleChange}
-                                    placeholder="Enter alternate phone number"
+                                    onKeyDown={(e) => {
+                                        if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) return;
+                                        if (e.ctrlKey || e.metaKey) return;
+                                        if (!/^[0-9+ ]$/.test(e.key)) e.preventDefault();
+                                    }}
+                                    placeholder="Enter alternate phone"
                                     style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontWeight: 600 }}
                                 />
                             </div>

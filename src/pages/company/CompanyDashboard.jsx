@@ -70,45 +70,81 @@ export default function CompanyDashboard() {
         }
     ];
 
+    const [quotaData, setQuotaData] = useState(null);
+
     useEffect(() => {
         loadData();
-    }, [currentUser, token]);
+    }, [currentUser, userData, token]);
 
     async function loadData() {
         try {
-            const uid = currentUser?.uid || 'user_company_001';
-            const compId = userData?.company_id || userData?.companyId || '';
+            const uid = currentUser?.uid || '';
+            const compId = userData?.company_id || userData?.companyId || uid;
+            const compName = (userData?.companyName || userData?.name || '').trim();
 
-            const [jobs, apps, subRes, plansRes] = await Promise.all([
-                getJobsByCompany(uid).catch(() => []),
-                getApplicationsByCompany(uid).catch(() => []),
+            let activeToken = token || localStorage.getItem('token');
+            if (!activeToken) {
+                try { activeToken = JSON.parse(localStorage.getItem('mock_current_session') || '{}')?.token; } catch(e){}
+            }
+
+            const [jobs, apps, subRes, plansRes, quotaRes] = await Promise.all([
+                getJobsByCompany(compId, compName).catch(() => []),
+                getApplicationsByCompany(compId, compName).catch(() => []),
                 fetch('http://localhost:5000/api/subscriptions/status', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${activeToken}` }
                 }).then(res => res.ok ? res.json() : null).catch(() => null),
-                fetch(`http://localhost:5000/api/subscriptions/plans?target_role=employer&company_id=${compId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                fetch('http://localhost:5000/api/plans?plan_type=employer&status=active')
+                    .then(res => res.ok ? res.json() : null).catch(() => null),
+                fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+                    headers: { 'Authorization': `Bearer ${activeToken}` }
                 }).then(res => res.ok ? res.json() : null).catch(() => null)
             ]);
             
+            if (quotaRes) setQuotaData(quotaRes);
+
             if (subRes && subRes.hasActiveSubscription) {
                 setSubscription(subRes);
-            } else {
-                // Check mock subscription in localStorage
-                const mockCompanySub = JSON.parse(localStorage.getItem('mock_company_subscription') || 'null');
-                if (mockCompanySub && new Date(mockCompanySub.expiryDate) > new Date()) {
-                    setSubscription({ hasActiveSubscription: true, subscription: mockCompanySub });
-                }
             }
 
             // Set Employer Plans (from Admin)
             let fetchedPlans = [];
             if (plansRes && Array.isArray(plansRes)) {
-                fetchedPlans = plansRes.filter(p => p.target_role === 'employer' || p.role === 'company');
+                fetchedPlans = plansRes.map(p => ({
+                    ...p,
+                    id: p.id,
+                    name: p.plan_name || p.name,
+                    price: p.offer_price !== undefined ? p.offer_price : (p.price || 0),
+                    job_limit: p.posting_limit !== undefined ? p.posting_limit : (p.job_limit || 20),
+                    contact_views: p.candidate_views_limit !== undefined ? p.candidate_views_limit : (p.contact_views || 50),
+                    resume_downloads: p.resume_download_limit !== undefined ? p.resume_download_limit : (p.resume_downloads || 50),
+                    billing_type: p.duration || 'mo'
+                }));
             }
             setEmployerPlans(fetchedPlans);
             
-            const employerJobs = (jobs || []).filter(j => j.companyId === uid || j.employerId === uid);
-            const employerApps = (apps || []).filter(a => a.companyId === uid || a.employerId === uid);
+            const currentCompNameLower = compName.toLowerCase();
+            const currentCompId = String(compId || '').trim();
+
+            const employerJobs = (jobs || []).filter(j => {
+                if (!currentCompNameLower && !currentCompId) return true;
+                const jCompName = (j.company_name || j.companyName || '').toLowerCase().trim();
+                const jCompId = String(j.company_id || j.companyId || '').trim();
+                const jEmpId = String(j.employer_id || j.employerId || '').trim();
+
+                const matchesName = Boolean(currentCompNameLower && jCompName && (jCompName === currentCompNameLower));
+                const matchesId = Boolean(currentCompId && (jCompId === currentCompId || jEmpId === currentCompId));
+                return matchesName || matchesId;
+            });
+
+            const employerApps = (apps || []).filter(a => {
+                if (!currentCompNameLower && !currentCompId) return true;
+                const aCompName = (a.companyName || a.company_name || '').toLowerCase().trim();
+                const aCompId = String(a.companyId || a.company_id || a.employerId || '').trim();
+
+                const matchesName = Boolean(currentCompNameLower && aCompName && (aCompName === currentCompNameLower));
+                const matchesId = Boolean(currentCompId && (aCompId === currentCompId));
+                return matchesName || matchesId;
+            });
 
             setStats({
                 jobs: employerJobs.length,
@@ -164,25 +200,85 @@ export default function CompanyDashboard() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Link to="/company/subscriptions" style={{
-                            textDecoration: 'none',
-                            background: '#f5f3ff', color: '#7c3aed', border: '1.5px solid #ddd6fe',
-                            padding: '11px 20px', borderRadius: '12px', cursor: 'pointer',
-                            fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px'
-                        }}>
-                            <FiCreditCard /> Subscription Plans
-                        </Link>
-                        <Link to="/company/post-job" style={{
-                            background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-                            color: 'white', textDecoration: 'none',
-                            padding: '11px 22px', borderRadius: '12px',
-                            fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px',
-                            boxShadow: '0 8px 18px rgba(124, 58, 237, 0.25)'
-                        }}>
-                            <FiPlus /> Post New Job
-                        </Link>
+                        {quotaData && !quotaData.canPostMore ? (
+                            <Link to="/company/subscriptions" style={{
+                                background: '#dc2626',
+                                color: 'white', textDecoration: 'none',
+                                padding: '11px 22px', borderRadius: '12px',
+                                fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px',
+                                boxShadow: '0 8px 18px rgba(220, 38, 38, 0.25)'
+                            }}>
+                                ⚡ Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                            </Link>
+                        ) : (
+                            <Link to="/company/post-job" style={{
+                                background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                                color: 'white', textDecoration: 'none',
+                                padding: '11px 22px', borderRadius: '12px',
+                                fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px',
+                                boxShadow: '0 8px 18px rgba(124, 58, 237, 0.25)'
+                            }}>
+                                <FiPlus /> Post New Job
+                            </Link>
+                        )}
                     </div>
                 </div>
+
+                {/* ── PLAN LIMIT REACHED ALERT BANNER ── */}
+                {quotaData && !quotaData.canPostMore && (
+                    <div style={{
+                        background: '#fef2f2',
+                        border: '2px solid #ef4444',
+                        borderRadius: '20px',
+                        padding: '20px 24px',
+                        marginBottom: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '16px',
+                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.15)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '14px',
+                                background: '#fee2e2', color: '#dc2626',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '1.5rem', flexShrink: 0
+                            }}>
+                                ⚠️
+                            </div>
+                            <div>
+                                <h4 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
+                                    Job Posting Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit} jobs posted)
+                                </h4>
+                                <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.88rem' }}>
+                                    {quotaData.nextPlan ? (
+                                        <>Next recommended package: <strong>{quotaData.nextPlan.name}</strong> ({quotaData.nextPlan.posting_limit === -1 ? 'Unlimited Jobs' : `${quotaData.nextPlan.posting_limit} Jobs`} - ₹{Number(quotaData.nextPlan.price).toLocaleString()}). Upgrade now to post more jobs.</>
+                                    ) : (
+                                        <>You have reached the maximum job limit for your current package. Please upgrade to post more jobs.</>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                        <Link
+                            to="/company/subscriptions"
+                            style={{
+                                background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                                color: 'white',
+                                textDecoration: 'none',
+                                padding: '12px 24px',
+                                borderRadius: '12px',
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Upgrade to Next Package →
+                        </Link>
+                    </div>
+                )}
 
                 {/* Active Subscription Banner */}
                 {subscription?.hasActiveSubscription ? (
@@ -202,8 +298,8 @@ export default function CompanyDashboard() {
                     }}>
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ background: '#10b981', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase' }}>
-                                    Active Plan
+                                <span style={{ background: '#10b981', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '10px', textTransform: 'uppercase' }}>
+                                    ✓ Currently Active Plan
                                 </span>
                                 <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
                                     Expires on {subscription.subscription.expiryDate ? new Date(subscription.subscription.expiryDate).toLocaleDateString('en-GB') : 'Active'} ({subscription.subscription.remainingDays || 30} days left)
@@ -309,14 +405,28 @@ export default function CompanyDashboard() {
                         gap: '20px'
                     }}>
                         {employerPlans.slice(0, 3).map((plan) => {
-                            const isCurrentActive = subscription?.hasActiveSubscription && (subscription.subscription.planName === plan.name || subscription.subscription.planId === plan.id);
+                            const isCurrentActive = Boolean(subscription?.hasActiveSubscription && (
+                                String(subscription.subscription?.planId) === String(plan.id) ||
+                                (subscription.subscription?.planName && plan.name && subscription.subscription.planName.trim().toLowerCase() === plan.name.trim().toLowerCase())
+                            ));
                             const isFree = Number(plan.price) === 0;
                             const isPopular = plan.is_popular === 1 || plan.is_popular === true || plan.badge_text;
-                            const featuresList = plan.features ? plan.features.split('\n').filter(Boolean).slice(0, 4) : [
-                                `${plan.job_limit === -1 ? 'Unlimited' : (plan.job_limit || 20)} Job Postings`,
-                                `${plan.contact_views === -1 ? 'Unlimited' : (plan.contact_views || 50)} Candidate Contact Views`,
-                                `${plan.resume_downloads === -1 ? 'Unlimited' : (plan.resume_downloads || 25)} Resume Downloads`
-                            ];
+                            let featuresList = [];
+                            if (Array.isArray(plan.features)) {
+                                featuresList = plan.features
+                                    .filter(f => f && (typeof f === 'string' || f.included !== false))
+                                    .map(f => typeof f === 'string' ? f : (f.feature_name + (f.feature_value ? ` (${f.feature_value})` : '')))
+                                    .slice(0, 4);
+                            } else if (typeof plan.features === 'string' && plan.features.trim()) {
+                                featuresList = plan.features.split('\n').filter(Boolean).slice(0, 4);
+                            }
+                            if (!featuresList || featuresList.length === 0) {
+                                featuresList = [
+                                    `${plan.job_limit === -1 ? 'Unlimited' : (plan.job_limit || 20)} Job Postings`,
+                                    `${plan.contact_views === -1 ? 'Unlimited' : (plan.contact_views || 50)} Candidate Contact Views`,
+                                    `${plan.resume_downloads === -1 ? 'Unlimited' : (plan.resume_downloads || 25)} Resume Downloads`
+                                ];
+                            }
 
                             return (
                                 <div

@@ -111,7 +111,21 @@ export default function ProfileEditModal({ isOpen, onClose, sectionKey, sectionT
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Mobile Number</label>
-                                    <input style={inputStyle} value={formData.phone || ''} onChange={e => handleChange('phone', e.target.value)} placeholder="Enter mobile number" />
+                                    <input 
+                                        type="tel"
+                                        inputMode="numeric"
+                                        pattern="[0-9]{10}"
+                                        maxLength={10}
+                                        style={inputStyle} 
+                                        value={formData.phone || ''} 
+                                        onChange={e => handleChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                                        onKeyDown={(e) => {
+                                            if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) return;
+                                            if (e.ctrlKey || e.metaKey) return;
+                                            if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                                        }}
+                                        placeholder="9876543210" 
+                                    />
                                 </div>
                             </div>
                         </>

@@ -4,12 +4,43 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="JobConnect - Find your dream job or hire the perfect candidate. A modern job portal for companies and job seekers." />
+    <meta name="theme-color" content="#2563eb" />
+    <title>JobConnect | India's #1 AI-Powered Job & Hiring Portal</title>
+    <meta name="description" content="Find verified high-paying jobs in Tech, Sales, Marketing, HR & Finance. Recruit top talent effortlessly with AI-powered candidate matching." />
+    <meta name="keywords" content="jobs in india, tech jobs, remote work, ai career analyzer, hiring portal, recruiter software, developer jobs, sales hiring" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="JobConnect | India's #1 AI-Powered Job & Hiring Portal" />
+    <meta property="og:description" content="Find verified high-paying jobs in Tech, Sales, Marketing, HR & Finance. Recruit top talent effortlessly." />
+    <meta property="og:site_name" content="JobConnect" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="JobConnect | India's #1 AI-Powered Job & Hiring Portal" />
+    <meta name="twitter:description" content="Find verified high-paying jobs in Tech, Sales, Marketing, HR & Finance. Recruit top talent effortlessly." />
+
+    <!-- Fonts & Scripts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <title>JobConnect - Job Portal</title>
+
+    <!-- Schema.org WebSite JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "JobConnect",
+      "url": "http://localhost:5173",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "http://localhost:5173/jobs?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

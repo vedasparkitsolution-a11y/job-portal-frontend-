@@ -31,6 +31,7 @@ export default function PostJob() {
     const [geoRadius, setGeoRadius] = useState('25');
     const [detectingGps, setDetectingGps] = useState(false);
     const [geoEmployerAccess, setGeoEmployerAccess] = useState(true);
+    const [isPublic, setIsPublic] = useState(true);
 
     // Section 2: Candidate Requirements
     const [experienceType, setExperienceType] = useState('Any Experience');
@@ -230,7 +231,13 @@ export default function PostJob() {
 
     async function fetchEmployerQuota() {
         try {
-            const token = localStorage.getItem('mock_current_session') ? JSON.parse(localStorage.getItem('mock_current_session')).token : null;
+            let token = localStorage.getItem('token');
+            if (!token) {
+                try {
+                    token = JSON.parse(localStorage.getItem('mock_current_session') || '{}')?.token;
+                } catch (e) {}
+            }
+            if (!token) return;
             const res = await fetch('http://localhost:5000/api/subscriptions/employer-quota', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -441,7 +448,7 @@ export default function PostJob() {
             longitude: longitude || '',
             geo_address: geoAddress || fullLocation,
             geo_radius: Number(geoRadius) || 25,
-            is_public: isPublic,
+            is_public: isPublic ? 1 : 0,
             application_questions: applicationQuestions,
             applicationQuestions: applicationQuestions,
             status: status,
@@ -453,6 +460,14 @@ export default function PostJob() {
     // Save as Draft (Requirement 13)
     async function handleSaveDraft(e) {
         if (e) e.preventDefault();
+        if (quotaData && !quotaData.canPostMore) {
+            setErrorMsg(
+                `⚠️ Plan limit reached! You have already posted ${quotaData.postedCount} of ${quotaData.allowedLimit} jobs allowed under your "${quotaData.activePlanName}" plan. Please upgrade your subscription to post more jobs.`
+            );
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
         setLoading(true);
         setErrorMsg('');
         setSuccessMsg('');
@@ -463,7 +478,12 @@ export default function PostJob() {
             setSuccessMsg('Job saved as Draft! You can edit and publish it anytime from Manage Jobs.');
             setTimeout(() => navigate('/company/manage-jobs'), 1500);
         } catch (err) {
-            setErrorMsg('Failed to save draft. Please try again.');
+            console.error('Save draft error:', err);
+            const msg = err.message || 'Failed to save draft. Please try again.';
+            setErrorMsg(msg);
+            if (msg.toLowerCase().includes('limit') || msg.toLowerCase().includes('upgrade')) {
+                setIsUpgradeModalOpen(true);
+            }
         }
         setLoading(false);
     }
@@ -474,15 +494,18 @@ export default function PostJob() {
         setErrorMsg('');
         setSuccessMsg('');
 
+        if (quotaData && !quotaData.canPostMore) {
+            setErrorMsg(
+                `⚠️ Plan limit reached! You have reached your limit of ${quotaData.allowedLimit} jobs on your "${quotaData.activePlanName}" plan. Next package: ${quotaData.nextPlan?.name || 'Unlimited Super Recruiter'}. Please upgrade your plan to post more jobs.`
+            );
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
         const valErr = validatePayload();
         if (valErr) {
             setErrorMsg(valErr);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-        }
-
-        if (quotaData && !quotaData.canPostMore) {
-            setIsUpgradeModalOpen(true);
             return;
         }
 
@@ -493,7 +516,12 @@ export default function PostJob() {
             setSuccessMsg('🎉 Job Posted Successfully! Candidates can now search and apply.');
             setTimeout(() => navigate('/company/manage-jobs'), 1600);
         } catch (err) {
-            setErrorMsg('Failed to publish job. Please try again.');
+            console.error('Job publishing error:', err);
+            const msg = err.message || 'Failed to publish job. Please try again.';
+            setErrorMsg(msg);
+            if (msg.toLowerCase().includes('limit') || msg.toLowerCase().includes('upgrade')) {
+                setIsUpgradeModalOpen(true);
+            }
         }
         setLoading(false);
     }
@@ -514,9 +542,15 @@ export default function PostJob() {
                         <button type="button" onClick={() => setIsPreviewOpen(true)} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' }}>
                             <FiEye /> Preview Job
                         </button>
-                        <button type="button" onClick={handlePublish} className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 24px' }}>
-                            <FiPlus /> {loading ? 'Publishing...' : 'Publish Job'}
-                        </button>
+                        {quotaData && !quotaData.canPostMore ? (
+                            <button type="button" onClick={() => setIsUpgradeModalOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 24px', background: '#dc2626', borderColor: '#dc2626' }}>
+                                ⚡ Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                            </button>
+                        ) : (
+                            <button type="button" onClick={handlePublish} className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 24px' }}>
+                                <FiPlus /> {loading ? 'Publishing...' : 'Publish Job'}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -525,41 +559,82 @@ export default function PostJob() {
                     <div style={{
                         background: quotaData.canPostMore ? '#f5f3ff' : '#fef2f2',
                         border: `1.5px solid ${quotaData.canPostMore ? '#ddd6fe' : '#fca5a5'}`,
-                        borderRadius: '18px', padding: '18px 24px', marginBottom: '24px',
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px'
+                        borderRadius: '18px', padding: '20px 24px', marginBottom: '24px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: quotaData.canPostMore ? '#ede9fe' : '#fee2e2', color: quotaData.canPostMore ? '#7c3aed' : '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                                <FiBriefcase />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <div style={{ 
+                                    width: '46px', height: '46px', borderRadius: '12px', 
+                                    background: quotaData.canPostMore ? '#ede9fe' : '#fee2e2', 
+                                    color: quotaData.canPostMore ? '#7c3aed' : '#dc2626', 
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' 
+                                }}>
+                                    <FiBriefcase />
+                                </div>
+                                <div>
+                                    <strong style={{ color: '#0f172a', fontSize: '1rem', display: 'block', marginBottom: '2px' }}>
+                                        {quotaData.isUnlimited 
+                                            ? '🚀 Unlimited Job Postings Active'
+                                            : `Job Posting Quota: ${quotaData.postedCount} of ${quotaData.allowedLimit} Jobs Used`
+                                        }
+                                    </strong>
+                                    <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                                        Current Plan: <strong style={{ color: '#7c3aed' }}>{quotaData.activePlanName}</strong>
+                                        {quotaData.isUnlimited 
+                                            ? ' • Unlimited Posts Allowed' 
+                                            : ` • ${quotaData.remainingJobs} Jobs Remaining`}
+                                        {!quotaData.isPremium && ` (Free Limit: ${quotaData.freeLimit} Jobs)`}
+                                    </span>
+                                </div>
                             </div>
-                            <div>
-                                <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>
-                                    Job Posting Quota: {quotaData.postedCount} of {quotaData.allowedLimit >= 9999 ? 'Unlimited' : quotaData.allowedLimit} Jobs Used
-                                </strong>
-                                <span style={{ display: 'block', fontSize: '0.82rem', color: '#64748b' }}>
-                                    Current Plan: <strong>{quotaData.activePlanName}</strong> {!quotaData.isPremium && `(Free Limit: ${quotaData.freeLimit} Jobs)`}
-                                </span>
-                            </div>
+
+                            {!quotaData.canPostMore ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#b91c1c', display: 'block' }}>
+                                            ⚠️ Job Posting Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit} jobs posted)
+                                        </span>
+                                        {quotaData.nextPlan && (
+                                            <span style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
+                                                Next package: <strong>{quotaData.nextPlan.name}</strong> ({quotaData.nextPlan.posting_limit === -1 ? 'Unlimited Jobs' : `${quotaData.nextPlan.posting_limit} Jobs`} - ₹{Number(quotaData.nextPlan.price).toLocaleString()})
+                                            </span>
+                                        )}
+                                    </div>
+                                    <Link
+                                        to="/company/subscriptions"
+                                        style={{
+                                            background: '#dc2626', color: 'white', textDecoration: 'none',
+                                            padding: '9px 20px', borderRadius: '10px', fontWeight: 800, fontSize: '0.86rem',
+                                            boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                                        }}
+                                    >
+                                        ⚡ Upgrade Next Package
+                                    </Link>
+                                </div>
+                            ) : (
+                                <Link
+                                    to="/company/subscriptions"
+                                    style={{ 
+                                        fontSize: '0.85rem', fontWeight: 800, color: '#7c3aed', textDecoration: 'none',
+                                        background: '#ede9fe', padding: '8px 16px', borderRadius: '8px'
+                                    }}
+                                >
+                                    View All Plans (20 Jobs, Unlimited) →
+                                </Link>
+                            )}
                         </div>
 
-                        {!quotaData.canPostMore ? (
-                            <button
-                                type="button"
-                                onClick={() => setIsUpgradeModalOpen(true)}
-                                style={{
-                                    background: '#dc2626', color: 'white', border: 'none',
-                                    padding: '8px 18px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer'
-                                }}
-                            >
-                                ⚡ Limit Reached — Upgrade Plan
-                            </button>
-                        ) : (
-                            <Link
-                                to="/company/subscriptions"
-                                style={{ fontSize: '0.85rem', fontWeight: 800, color: '#7c3aed', textDecoration: 'none' }}
-                            >
-                                View Premium Packages (20, 50, 100 Jobs) →
-                            </Link>
+                        {!quotaData.isUnlimited && quotaData.allowedLimit > 0 && (
+                            <div style={{ marginTop: '14px', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
+                                <div style={{
+                                    height: '100%',
+                                    borderRadius: '10px',
+                                    background: quotaData.canPostMore ? 'linear-gradient(90deg, #7c3aed, #a855f7)' : '#dc2626',
+                                    width: `${Math.min(100, (quotaData.postedCount / quotaData.allowedLimit) * 100)}%`,
+                                    transition: 'width 0.5s ease'
+                                }} />
+                            </div>
                         )}
                     </div>
                 )}
@@ -1464,9 +1539,15 @@ export default function PostJob() {
                                 <FiEye /> Preview Job
                             </button>
 
-                            <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 800 }}>
-                                <FiPlus /> {loading ? 'Publishing...' : 'Publish Job Now'}
-                            </button>
+                            {quotaData && !quotaData.canPostMore ? (
+                                <button type="button" onClick={() => setIsUpgradeModalOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 800, background: '#dc2626', borderColor: '#dc2626' }}>
+                                    ⚡ Free Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                                </button>
+                            ) : (
+                                <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 800 }}>
+                                    <FiPlus /> {loading ? 'Publishing...' : 'Publish Job Now'}
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -1555,35 +1636,42 @@ export default function PostJob() {
                                 <FiBriefcase />
                             </div>
 
-                            <h2 style={{ margin: '0 0 8px', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>
-                                Job Posting Limit Reached
+                            <h2 style={{ margin: '0 0 8px', fontSize: '1.5rem', fontWeight: 900, color: '#dc2626' }}>
+                                ⚠️ Job Posting Limit Reached!
                             </h2>
 
-                            <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '24px', lineHeight: 1.5 }}>
-                                You have posted <strong>{quotaData?.postedCount || 3} of {quotaData?.allowedLimit || 3} jobs</strong> under your current plan ({quotaData?.activePlanName || 'Free Tier'}).
+                            <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '20px', lineHeight: 1.5 }}>
+                                You have posted <strong>{quotaData?.postedCount || 0} of {quotaData?.allowedLimit || 20} jobs</strong> allowed under your current plan (<strong>{quotaData?.activePlanName || 'Plan'}</strong>).
                                 <br />
-                                Upgrade to a <strong>Premium Employer Package</strong> to post 20, 50, or 100 jobs!
+                                To post more jobs, please upgrade to the next package.
                             </p>
 
-                            {/* Package Highlights */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
-                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 12px' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Starter</span>
-                                    <h4 style={{ margin: '4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>20 Jobs</h4>
-                                    <strong style={{ color: '#7c3aed', fontSize: '0.9rem' }}>₹499/mo</strong>
+                            {/* Next Package Highlight */}
+                            {quotaData?.nextPlan && (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                    border: '2px solid #10b981',
+                                    borderRadius: '18px',
+                                    padding: '18px 20px',
+                                    marginBottom: '24px',
+                                    textAlign: 'left'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#10b981', color: '#fff', padding: '3px 10px', borderRadius: '8px', textTransform: 'uppercase' }}>
+                                            Next Recommended Package
+                                        </span>
+                                        <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>
+                                            ₹{Number(quotaData.nextPlan.price).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <h4 style={{ margin: '0 0 4px', fontSize: '1.2rem', fontWeight: 900, color: '#065f46' }}>
+                                        {quotaData.nextPlan.name}
+                                    </h4>
+                                    <p style={{ margin: 0, fontSize: '0.86rem', color: '#166534' }}>
+                                        💼 {quotaData.nextPlan.posting_limit === -1 ? 'Unlimited Job Postings' : `${quotaData.nextPlan.posting_limit} Job Postings`} • ⏰ {quotaData.nextPlan.duration}
+                                    </p>
                                 </div>
-                                <div style={{ background: '#f5f3ff', border: '2px solid #7c3aed', borderRadius: '16px', padding: '16px 12px', position: 'relative' }}>
-                                    <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: '#fff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap' }}>POPULAR</span>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase' }}>Growth</span>
-                                    <h4 style={{ margin: '4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>50 Jobs</h4>
-                                    <strong style={{ color: '#7c3aed', fontSize: '0.9rem' }}>₹999/mo</strong>
-                                </div>
-                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 12px' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Enterprise</span>
-                                    <h4 style={{ margin: '4px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>100 Jobs</h4>
-                                    <strong style={{ color: '#7c3aed', fontSize: '0.9rem' }}>₹1,800/mo</strong>
-                                </div>
-                            </div>
+                            )}
 
                             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                                 <button

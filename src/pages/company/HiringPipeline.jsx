@@ -23,11 +23,11 @@ export default function HiringPipeline() {
     const [columns, setColumns] = useState({});
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
-    const { token } = useAuth();
+    const { token, userData, currentUser } = useAuth();
 
     useEffect(() => {
         loadData();
-    }, [jobId]);
+    }, [jobId, userData]);
 
     async function loadData() {
         try {
@@ -36,6 +36,22 @@ export default function HiringPipeline() {
                 getApplicationsByJob(jobId)
             ]);
             setJob(jobData);
+
+            if (jobData && userData && userData.role === 'company') {
+                const currentCompName = (userData.companyName || '').toLowerCase().trim();
+                const currentCompId = String(userData.company_id || userData.companyId || currentUser?.uid || '').trim();
+                const jobCompName = (jobData.company_name || jobData.companyName || '').toLowerCase().trim();
+                const jobCompId = String(jobData.company_id || jobData.companyId || '').trim();
+                const jobEmpId = String(jobData.employer_id || jobData.employerId || '').trim();
+
+                const isOwner = Boolean(currentCompName && jobCompName === currentCompName) ||
+                                Boolean(currentCompId && (jobCompId === currentCompId || jobEmpId === currentCompId));
+                if (!isOwner) {
+                    addToast('error', 'Access Denied: This job belongs to another company.');
+                    navigate('/company/manage-jobs');
+                    return;
+                }
+            }
 
             // Group applications by status
             const initialCols = {

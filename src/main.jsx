@@ -11,8 +11,6 @@ window.onerror = function(msg, url, lineNo, columnNo, error) {
     return false;
 };
 
-console.log('Main.jsx is loading...');
-
 try {
     ReactDOM.createRoot(document.getElementById('root')).render(
         <React.StrictMode>
@@ -25,7 +23,6 @@ try {
             </BrowserRouter>
         </React.StrictMode>
     )
-    console.log('React render called.');
 } catch (err) {
     console.error('Render crash:', err);
 }

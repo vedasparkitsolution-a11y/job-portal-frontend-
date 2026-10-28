@@ -1,11 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const db = require('../db');
 const { verifyToken, verifyRole } = require('../middleware/authMiddleware');
-
-const dbPath = path.resolve(__dirname, '../database.sqlite');
-const db = new sqlite3.Database(dbPath);
 
 // Helper: Record Admin Audit Log
 const recordAuditLog = (user, action, targetType, targetId, targetName, description, details = {}) => {
@@ -137,6 +133,8 @@ router.post('/', verifyToken, verifyRole(['admin']), (req, res) => {
         duration_days = 30,
         posting_limit = 1,
         application_limit = 10,
+        candidate_views_limit = 50,
+        resume_download_limit = 50,
         popular = 0,
         is_popular = 0,
         recommended = 0,
@@ -164,8 +162,11 @@ router.post('/', verifyToken, verifyRole(['admin']), (req, res) => {
     }
 
     const finalLimit = plan_type === 'candidate' 
-        ? (Number(application_limit) || Number(posting_limit) || 10) 
-        : (Number(posting_limit) || 1);
+        ? (application_limit !== undefined ? Number(application_limit) : (posting_limit !== undefined ? Number(posting_limit) : 10)) 
+        : (posting_limit !== undefined ? Number(posting_limit) : 1);
+
+    const candLimit = candidate_views_limit !== undefined ? Number(candidate_views_limit) : 50;
+    const resLimit = resume_download_limit !== undefined ? Number(resume_download_limit) : 50;
 
     const isPop = (popular || is_popular) ? 1 : 0;
     const isRec = (recommended || is_recommended) ? 1 : 0;
@@ -174,13 +175,15 @@ router.post('/', verifyToken, verifyRole(['admin']), (req, res) => {
         INSERT INTO plans (
             plan_type, plan_name, description, original_price, offer_price,
             discount_percentage, duration, duration_days, posting_limit,
+            candidate_views_limit, resume_download_limit,
             popular, recommended, status, badge_text, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
 
     db.run(sql, [
         plan_type, finalPlanName, description, origPrice, offPrice,
         discountPercentage, duration, Number(duration_days) || 30, finalLimit,
+        candLimit, resLimit,
         isPop, isRec, status, badge_text
     ], function (err) {
         if (err) {
@@ -192,23 +195,18 @@ router.post('/', verifyToken, verifyRole(['admin']), (req, res) => {
 
         // Insert features
         if (Array.isArray(features) && features.length > 0) {
-            const stmt = db.prepare(`
-                INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order)
-                VALUES (?, ?, ?, ?, ?)
-            `);
-
             features.forEach((f, idx) => {
                 const fName = (f.feature_name || f.name || '').trim();
                 if (fName) {
                     const inc = (f.included === true || f.included === 1 || f.included === '1') ? 1 : 0;
-                    stmt.run([newPlanId, fName, inc, f.feature_value || f.value || '', idx]);
+                    db.run(
+                        `INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order) VALUES (?, ?, ?, ?, ?)`,
+                        [newPlanId, fName, inc, f.feature_value || f.value || '', idx]
+                    );
                 }
             });
-
-            stmt.finalize(() => {
-                recordAuditLog(req.user, 'CREATE_PLAN', 'plans', newPlanId, finalPlanName, `Created ${plan_type} plan "${finalPlanName}" with ${features.length} features`, req.body);
-                res.status(201).json({ success: true, message: 'Plan created successfully', planId: newPlanId });
-            });
+            recordAuditLog(req.user, 'CREATE_PLAN', 'plans', newPlanId, finalPlanName, `Created ${plan_type} plan "${finalPlanName}" with ${features.length} features`, req.body);
+            res.status(201).json({ success: true, message: 'Plan created successfully', planId: newPlanId });
         } else {
             recordAuditLog(req.user, 'CREATE_PLAN', 'plans', newPlanId, finalPlanName, `Created ${plan_type} plan "${finalPlanName}"`, req.body);
             res.status(201).json({ success: true, message: 'Plan created successfully', planId: newPlanId });
@@ -230,6 +228,8 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
         duration_days = 30,
         posting_limit = 1,
         application_limit = 10,
+        candidate_views_limit = 50,
+        resume_download_limit = 50,
         popular = 0,
         is_popular = 0,
         recommended = 0,
@@ -253,8 +253,11 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
     }
 
     const finalLimit = plan_type === 'candidate' 
-        ? (Number(application_limit) || Number(posting_limit) || 10) 
-        : (Number(posting_limit) || 1);
+        ? (application_limit !== undefined ? Number(application_limit) : (posting_limit !== undefined ? Number(posting_limit) : 10)) 
+        : (posting_limit !== undefined ? Number(posting_limit) : 1);
+
+    const candLimit = candidate_views_limit !== undefined ? Number(candidate_views_limit) : 50;
+    const resLimit = resume_download_limit !== undefined ? Number(resume_download_limit) : 50;
 
     const isPop = (popular || is_popular) ? 1 : 0;
     const isRec = (recommended || is_recommended) ? 1 : 0;
@@ -263,6 +266,7 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
         UPDATE plans SET
             plan_type = ?, plan_name = ?, description = ?, original_price = ?, offer_price = ?,
             discount_percentage = ?, duration = ?, duration_days = ?, posting_limit = ?,
+            candidate_views_limit = ?, resume_download_limit = ?,
             popular = ?, recommended = ?, status = ?, badge_text = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `;
@@ -270,6 +274,7 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
     db.run(sql, [
         plan_type, finalPlanName, description, origPrice, offPrice,
         discountPercentage, duration, Number(duration_days) || 30, finalLimit,
+        candLimit, resLimit,
         isPop, isRec, status, badge_text, id
     ], function (err) {
         if (err) {
@@ -280,23 +285,18 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
         // Synchronize features: delete existing and re-insert
         db.run('DELETE FROM plan_features WHERE plan_id = ?', [id], (delErr) => {
             if (Array.isArray(features) && features.length > 0) {
-                const stmt = db.prepare(`
-                    INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order)
-                    VALUES (?, ?, ?, ?, ?)
-                `);
-
                 features.forEach((f, idx) => {
                     const fName = (f.feature_name || f.name || '').trim();
                     if (fName) {
                         const inc = (f.included === true || f.included === 1 || f.included === '1') ? 1 : 0;
-                        stmt.run([id, fName, inc, f.feature_value || f.value || '', idx]);
+                        db.run(
+                            `INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order) VALUES (?, ?, ?, ?, ?)`,
+                            [id, fName, inc, f.feature_value || f.value || '', idx]
+                        );
                     }
                 });
-
-                stmt.finalize(() => {
-                    recordAuditLog(req.user, 'UPDATE_PLAN', 'plans', id, finalPlanName, `Updated plan "${finalPlanName}" and features`, req.body);
-                    res.json({ success: true, message: 'Plan updated successfully' });
-                });
+                recordAuditLog(req.user, 'UPDATE_PLAN', 'plans', id, finalPlanName, `Updated plan "${finalPlanName}" and features`, req.body);
+                res.json({ success: true, message: 'Plan updated successfully' });
             } else {
                 recordAuditLog(req.user, 'UPDATE_PLAN', 'plans', id, finalPlanName, `Updated plan "${finalPlanName}"`, req.body);
                 res.json({ success: true, message: 'Plan updated successfully' });
@@ -366,17 +366,14 @@ router.post('/:id/duplicate', verifyToken, verifyRole(['admin']), (req, res) => 
 
             db.all('SELECT * FROM plan_features WHERE plan_id = ? ORDER BY display_order ASC', [id], (fErr, features) => {
                 if (features && features.length > 0) {
-                    const stmt = db.prepare(`
-                        INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order)
-                        VALUES (?, ?, ?, ?, ?)
-                    `);
                     features.forEach((f, idx) => {
-                        stmt.run([newPlanId, f.feature_name, f.included, f.feature_value || '', idx]);
+                        db.run(
+                            `INSERT INTO plan_features (plan_id, feature_name, included, feature_value, display_order) VALUES (?, ?, ?, ?, ?)`,
+                            [newPlanId, f.feature_name, f.included, f.feature_value || '', idx]
+                        );
                     });
-                    stmt.finalize(() => {
-                        recordAuditLog(req.user, 'DUPLICATE_PLAN', 'plans', newPlanId, newName, `Duplicated plan from #${id}`);
-                        res.status(201).json({ success: true, message: `Plan duplicated as "${newName}"`, planId: newPlanId });
-                    });
+                    recordAuditLog(req.user, 'DUPLICATE_PLAN', 'plans', newPlanId, newName, `Duplicated plan from #${id}`);
+                    res.status(201).json({ success: true, message: `Plan duplicated as "${newName}"`, planId: newPlanId });
                 } else {
                     recordAuditLog(req.user, 'DUPLICATE_PLAN', 'plans', newPlanId, newName, `Duplicated plan from #${id}`);
                     res.status(201).json({ success: true, message: `Plan duplicated as "${newName}"`, planId: newPlanId });

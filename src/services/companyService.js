@@ -1,78 +1,101 @@
-// Mock Company Service — uses localStorage instead of Firestore
+// REST Company Service — interacts purely with MySQL Backend API
 
-const COMPANIES_KEY = 'mock_companies';
+import { API_BASE_URL } from '../config/api';
 
-function getCompanies() {
-    return JSON.parse(localStorage.getItem(COMPANIES_KEY) || '[]');
-}
+const API_BASE = `${API_BASE_URL}/api/employer`;
 
-function saveCompanies(companies) {
-    try {
-        localStorage.setItem(COMPANIES_KEY, JSON.stringify(companies));
-    } catch (e) {
-        console.warn('localStorage quota exceeded in saveCompanies. Stripping large logo Base64 strings...', e);
-        try {
-            const sanitized = companies.map(c => ({
-                ...c,
-                logoURL: (c.logoURL && c.logoURL.length > 30000) ? '' : c.logoURL,
-                companyLogo: (c.companyLogo && c.companyLogo.length > 30000) ? '' : c.companyLogo
-            }));
-            localStorage.setItem(COMPANIES_KEY, JSON.stringify(sanitized));
-        } catch (innerErr) {
-            console.error('Failed to save companies to localStorage:', innerErr);
-        }
-    }
-}
-
-
-function generateId() {
-    return 'company_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+function getAuthHeader() {
+    const token = localStorage.getItem('token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
 export async function getCompany(companyId) {
-    const companies = getCompanies();
-    return companies.find(c => c.id === companyId) || null;
+    if (!companyId) return null;
+    try {
+        const res = await fetch(`${API_BASE}/profile`, {
+            headers: { ...getAuthHeader() }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data.company || data.user || null;
+        }
+    } catch (e) {
+        console.error(`Error fetching company ${companyId}:`, e);
+    }
+    return null;
 }
 
 export async function getAllCompanies() {
-    return getCompanies().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/users?role=company`, {
+            headers: { ...getAuthHeader() }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data.users || [];
+        }
+    } catch (e) {
+        console.error('Error fetching companies:', e);
+    }
+    return [];
 }
 
 export async function getPendingCompanies() {
-    return getCompanies().filter(c => c.status === 'pending');
+    const companies = await getAllCompanies();
+    return companies.filter(c => c.status === 'pending' || c.approved_access === 0);
 }
 
 export async function approveCompany(companyId) {
-    const companies = getCompanies();
-    const index = companies.findIndex(c => c.id === companyId);
-    if (index !== -1) {
-        companies[index].status = 'approved';
-        saveCompanies(companies);
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/companies/${companyId}/approved-access`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({ approved_access: 1 })
+        });
+        return res.ok;
+    } catch (e) {
+        console.error(`Error approving company ${companyId}:`, e);
+        return false;
     }
 }
 
 export async function rejectCompany(companyId) {
-    const companies = getCompanies();
-    const index = companies.findIndex(c => c.id === companyId);
-    if (index !== -1) {
-        companies[index].status = 'rejected';
-        saveCompanies(companies);
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/companies/${companyId}/approved-access`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({ approved_access: 0 })
+        });
+        return res.ok;
+    } catch (e) {
+        console.error(`Error rejecting company ${companyId}:`, e);
+        return false;
     }
 }
 
 export async function updateCompanyProfile(companyId, data) {
-    const companies = getCompanies();
-    const index = companies.findIndex(c => c.id === companyId);
-    if (index !== -1) {
-        companies[index] = { ...companies[index], ...data };
-        saveCompanies(companies);
+    try {
+        const res = await fetch(`${API_BASE}/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify(data)
+        });
+        return res.ok;
+    } catch (e) {
+        console.error(`Error updating company profile ${companyId}:`, e);
+        return false;
     }
 }
 
 export async function createCompanyByAdmin(companyData) {
-    const companies = getCompanies();
-    const id = generateId();
-    companies.unshift({ id, ...companyData, status: 'approved', addedByAdmin: true, createdAt: new Date().toISOString() });
-    saveCompanies(companies);
-    return id;
+    return await updateCompanyProfile(companyData.id, companyData);
 }

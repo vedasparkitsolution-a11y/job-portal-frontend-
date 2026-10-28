@@ -1,0 +1,20 @@
+# JobConnect Robots.txt
+User-agent: *
+Allow: /
+Allow: /jobs
+Allow: /job/
+Allow: /companies
+Allow: /candidate-plans
+Allow: /employer-plans
+Allow: /about
+Allow: /contact
+Allow: /career-analyzer
+
+# Disallow private user dashboards & admin area
+Disallow: /admin/
+Disallow: /company/
+Disallow: /jobseeker/
+Disallow: /api/
+
+Sitemap: http://localhost:5000/sitemap.xml
+Sitemap: http://localhost:5173/sitemap.xml

@@ -98,6 +98,8 @@ export default function SubscriptionPlans() {
         if (selectedPostingsFilter === '1') return limit === 1;
         if (selectedPostingsFilter === '2') return limit === 2;
         if (selectedPostingsFilter === '3') return limit === 3;
+        if (selectedPostingsFilter === '20') return limit === 20;
+        if (selectedPostingsFilter === 'unlimited') return limit === -1 || limit >= 999999;
         if (selectedPostingsFilter === '4+') return limit >= 4 || limit === -1;
         return true;
     });
@@ -137,6 +139,50 @@ export default function SubscriptionPlans() {
                 </p>
             </div>
 
+            {/* ── CURRENT ACTIVE PLAN BANNER ── */}
+            {subStatus && (
+                <div style={{
+                    background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)',
+                    border: '1.5px solid #10b981',
+                    borderRadius: '20px',
+                    padding: '22px 28px',
+                    color: '#ffffff',
+                    marginBottom: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    boxShadow: '0 8px 24px rgba(16, 185, 129, 0.2)'
+                }}>
+                    <div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#047857', padding: '4px 12px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>
+                            <FiCheckCircle /> Currently Active Subscription
+                        </div>
+                        <h2 style={{ margin: '0 0 6px', fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', textTransform: 'capitalize' }}>
+                            {subStatus.planName} Plan Active
+                        </h2>
+                        <div style={{ fontSize: '0.92rem', color: '#a7f3d0', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                            <span>💼 Remaining Jobs: <strong>{subStatus.jobsRemaining !== undefined ? subStatus.jobsRemaining : 'Active'}</strong></span>
+                            <span>👥 Candidate Contacts: <strong>{subStatus.contactsRemaining !== undefined ? subStatus.contactsRemaining : 'Active'}</strong></span>
+                            <span>📅 Valid Until: <strong>{subStatus.expiryDate ? new Date(subStatus.expiryDate).toLocaleDateString('en-GB') : 'Active'}</strong> ({subStatus.remainingDays || 30} days left)</span>
+                        </div>
+                    </div>
+                    <Link to="/company" style={{
+                        background: '#ffffff',
+                        color: '#065f46',
+                        padding: '11px 22px',
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        fontWeight: 800,
+                        fontSize: '0.92rem',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                        Go to Dashboard →
+                    </Link>
+                </div>
+            )}
+
             {/* ── INTERACTIVE POSTING SELECTOR TABS ── */}
             <div style={{ textAlign: 'center', marginBottom: '36px' }}>
                 <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#334155', marginBottom: '12px' }}>
@@ -144,11 +190,13 @@ export default function SubscriptionPlans() {
                 </div>
                 <div style={{ display: 'inline-flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     {[
+                        { id: 'all', label: 'All Plans' },
+                        { id: '20', label: '⭐ 20 Jobs (₹1,500)' },
+                        { id: 'unlimited', label: '🚀 Unlimited Jobs (₹5,000)' },
                         { id: '1', label: '1 Posting' },
                         { id: '2', label: '2 Postings' },
                         { id: '3', label: '3 Postings' },
-                        { id: '4+', label: '4+ Postings' },
-                        { id: 'all', label: 'All Plans' }
+                        { id: '4+', label: '4+ Postings' }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -202,6 +250,10 @@ export default function SubscriptionPlans() {
                     }}
                 >
                     {filteredPlans.map(plan => {
+                        const isActivePlan = Boolean(subStatus && (
+                            String(subStatus.planId) === String(plan.id) ||
+                            (subStatus.planName && plan.plan_name && subStatus.planName.trim().toLowerCase() === plan.plan_name.trim().toLowerCase())
+                        ));
                         const isPopular = Boolean(plan.popular || plan.is_popular);
                         const isRecommended = Boolean(plan.recommended || plan.is_recommended);
                         const features = plan.features || [];
@@ -210,30 +262,36 @@ export default function SubscriptionPlans() {
                             <div
                                 key={plan.id}
                                 style={{
-                                    background: '#ffffff',
+                                    background: isActivePlan ? '#f0fdf4' : '#ffffff',
                                     borderRadius: '24px',
-                                    border: isPopular ? '2px solid #f59e0b' : (isRecommended ? '2px solid #3b82f6' : '1px solid #e2e8f0'),
+                                    border: isActivePlan 
+                                        ? '2.5px solid #10b981' 
+                                        : (isPopular ? '2px solid #f59e0b' : (isRecommended ? '2px solid #3b82f6' : '1px solid #e2e8f0')),
                                     padding: '32px 28px',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     position: 'relative',
-                                    boxShadow: isPopular 
-                                        ? '0 16px 36px rgba(245, 158, 11, 0.18)' 
-                                        : (isRecommended ? '0 16px 36px rgba(59, 130, 246, 0.14)' : '0 4px 20px rgba(0,0,0,0.03)'),
-                                    transform: isPopular ? 'scale(1.02)' : 'none',
+                                    boxShadow: isActivePlan
+                                        ? '0 16px 36px rgba(16, 185, 129, 0.18)'
+                                        : (isPopular 
+                                            ? '0 16px 36px rgba(245, 158, 11, 0.18)' 
+                                            : (isRecommended ? '0 16px 36px rgba(59, 130, 246, 0.14)' : '0 4px 20px rgba(0,0,0,0.03)')),
+                                    transform: (isActivePlan || isPopular) ? 'scale(1.02)' : 'none',
                                     transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                                 }}
                             >
                                 {/* Top Badge */}
-                                {(isPopular || isRecommended || plan.badge_text) && (
+                                {(isActivePlan || isPopular || isRecommended || plan.badge_text) && (
                                     <div style={{
                                         position: 'absolute',
                                         top: '-14px',
                                         left: '50%',
                                         transform: 'translateX(-50%)',
-                                        background: isPopular 
-                                            ? 'linear-gradient(135deg, #f59e0b, #d97706)' 
-                                            : (isRecommended ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#0ea5e9'),
+                                        background: isActivePlan
+                                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                                            : (isPopular 
+                                                ? 'linear-gradient(135deg, #f59e0b, #d97706)' 
+                                                : (isRecommended ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#0ea5e9')),
                                         color: '#ffffff',
                                         fontSize: '0.74rem',
                                         fontWeight: 900,
@@ -244,12 +302,12 @@ export default function SubscriptionPlans() {
                                         whiteSpace: 'nowrap',
                                         textTransform: 'uppercase'
                                     }}>
-                                        {plan.badge_text || (isPopular ? 'MOST POPULAR' : 'RECOMMENDED')}
+                                        {isActivePlan ? '✓ CURRENT ACTIVE PLAN' : (plan.badge_text || (isPopular ? 'MOST POPULAR' : 'RECOMMENDED'))}
                                     </div>
                                 )}
 
                                 {/* Plan Title & Subtitle */}
-                                <div style={{ marginBottom: '14px', marginTop: (isPopular || isRecommended) ? '4px' : '0' }}>
+                                <div style={{ marginBottom: '14px', marginTop: (isActivePlan || isPopular || isRecommended) ? '4px' : '0' }}>
                                     <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>
                                         {plan.plan_name}
                                     </h3>
@@ -283,35 +341,60 @@ export default function SubscriptionPlans() {
                                     <span style={{ fontSize: '0.8rem', fontWeight: 700, background: '#f8fafc', color: '#475569', padding: '5px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                                         ⏰ {plan.duration}
                                     </span>
+                                    {(plan.candidate_views_limit !== undefined || plan.contact_views !== undefined) && (
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 800, background: '#f0fdf4', color: '#15803d', padding: '5px 12px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                                            🎓 {(plan.candidate_views_limit === -1 || plan.candidate_views_limit >= 999999) ? 'Unlimited' : (plan.candidate_views_limit || plan.contact_views || 50)} Student Details & Resumes
+                                        </span>
+                                    )}
                                 </div>
 
-                                {/* Buy Now CTA Button */}
-                                <button
-                                    onClick={() => handleUpgrade(plan)}
-                                    disabled={processing}
-                                    style={{
+                                {/* Buy Now CTA Button / Active State */}
+                                {isActivePlan ? (
+                                    <div style={{
                                         width: '100%',
                                         padding: '14px',
                                         borderRadius: '14px',
-                                        border: 'none',
-                                        background: isPopular 
-                                            ? 'linear-gradient(135deg, #f59e0b, #d97706)' 
-                                            : 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                                        color: '#0f172a',
+                                        border: '2px solid #10b981',
+                                        background: '#dcfce7',
+                                        color: '#15803d',
                                         fontWeight: 900,
                                         fontSize: '1rem',
-                                        cursor: processing ? 'not-allowed' : 'pointer',
-                                        boxShadow: '0 4px 16px rgba(245, 158, 11, 0.35)',
                                         marginBottom: '26px',
-                                        transition: 'transform 0.15s ease',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: '8px'
-                                    }}
-                                >
-                                    Buy Now <FiChevronRight />
-                                </button>
+                                    }}>
+                                        <FiCheckCircle size={18} color="#16a34a" /> Currently Active Plan
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => handleUpgrade(plan)}
+                                        disabled={processing}
+                                        style={{
+                                            width: '100%',
+                                            padding: '14px',
+                                            borderRadius: '14px',
+                                            border: 'none',
+                                            background: isPopular 
+                                                ? 'linear-gradient(135deg, #f59e0b, #d97706)' 
+                                                : 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                                            color: '#0f172a',
+                                            fontWeight: 900,
+                                            fontSize: '1rem',
+                                            cursor: processing ? 'not-allowed' : 'pointer',
+                                            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.35)',
+                                            marginBottom: '26px',
+                                            transition: 'transform 0.15s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        Buy Now <FiChevronRight />
+                                    </button>
+                                )}
 
                                 {/* Dynamic Features List (✓ Included / ✕ Not Included) */}
                                 <div style={{ flex: 1, borderTop: '1px solid #f1f5f9', paddingTop: '18px' }}>

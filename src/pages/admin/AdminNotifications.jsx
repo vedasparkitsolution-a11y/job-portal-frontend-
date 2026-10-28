@@ -135,18 +135,13 @@ export default function AdminNotifications() {
             });
             if (res.ok) {
                 const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    setNotifications(data);
-                    setLoading(false);
-                    return;
-                }
+                setNotifications(Array.isArray(data) ? data : []);
+            } else {
+                setNotifications(INITIAL_NOTIFICATIONS);
             }
         } catch (e) {
-            console.error('Fetch notifications fallback:', e);
+            setNotifications(INITIAL_NOTIFICATIONS);
         }
-
-        const cached = JSON.parse(localStorage.getItem('admin_broadcast_notifications') || '[]');
-        setNotifications(cached.length > 0 ? cached : INITIAL_NOTIFICATIONS);
         setLoading(false);
     };
 
@@ -178,27 +173,14 @@ export default function AdminNotifications() {
                 body: JSON.stringify(composeForm)
             });
 
-            let newNotif;
             if (res.ok) {
-                const data = await res.json();
-                newNotif = data.notification;
+                toastSuccess(`Notification broadcasted to ${composeForm.target_group === 'all' ? 'All Users' : (composeForm.target_group === 'candidates' ? 'Candidates' : 'Employers')}!`);
+                setShowComposeModal(false);
+                fetchNotifications();
             } else {
-                newNotif = {
-                    ...composeForm,
-                    id: Date.now(),
-                    sender_name: 'System Admin',
-                    sent_count: composeForm.target_group === 'all' ? 1740 : (composeForm.target_group === 'candidates' ? 1420 : 320),
-                    created_at: new Date().toISOString()
-                };
+                const errData = await res.json().catch(() => ({}));
+                toastError(errData.message || 'Failed to send notification');
             }
-
-            const updated = [newNotif, ...notifications];
-            setNotifications(updated);
-            localStorage.setItem('admin_broadcast_notifications', JSON.stringify(updated));
-
-            toastSuccess(`Notification broadcasted to ${composeForm.target_group === 'all' ? 'All Users' : (composeForm.target_group === 'candidates' ? 'Candidates' : 'Employers')}!`);
-            setShowComposeModal(false);
-            fetchNotifications();
         } catch (err) {
             toastError('Failed to send notification');
         }
@@ -208,15 +190,14 @@ export default function AdminNotifications() {
         if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
 
         try {
-            await fetch(`http://localhost:5000/api/admin/notifications/${id}`, {
+            const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
-            }).catch(() => null);
-
-            const updated = notifications.filter(n => n.id !== id);
-            setNotifications(updated);
-            localStorage.setItem('admin_broadcast_notifications', JSON.stringify(updated));
-            toastSuccess('Notification removed successfully');
+            });
+            if (res.ok) {
+                toastSuccess('Notification removed successfully');
+                fetchNotifications();
+            }
         } catch (e) {
             toastError('Failed to delete notification');
         }

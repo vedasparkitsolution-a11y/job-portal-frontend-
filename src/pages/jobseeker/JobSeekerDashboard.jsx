@@ -79,6 +79,9 @@ export default function JobSeekerDashboard() {
         }
     ];
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState('All');
+
     useEffect(() => {
         loadData();
     }, [currentUser, token]);
@@ -95,7 +98,7 @@ export default function JobSeekerDashboard() {
                 fetch('http://localhost:5000/api/subscriptions/candidate-plans').catch(() => null)
             ]);
 
-            setRecentJobs(Array.isArray(jobs) ? jobs.slice(0, 6) : []);
+            setRecentJobs(Array.isArray(jobs) ? jobs : []);
             setAppCount(Array.isArray(apps) ? apps.length : 0);
 
             // Set Perks
@@ -399,9 +402,149 @@ export default function JobSeekerDashboard() {
                     </div>
                     <div>
                         <div style={statValStyle}>{recentJobs.length}</div>
-                        <div style={statLabelStyle}>Recommended Jobs</div>
+                        <div style={statLabelStyle}>Open Jobs</div>
                     </div>
                 </div>
+            </div>
+
+            {/* ── MATCHING & LATEST JOB OPPORTUNITIES (FRONT & CENTER) ── */}
+            <div style={{ marginBottom: '44px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '0.78rem', fontWeight: 800, padding: '3px 10px', borderRadius: '12px' }}>
+                                Live Job Openings ({recentJobs.length})
+                            </span>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Latest job postings from verified employers</span>
+                        </div>
+                        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                            Matching <span style={{ color: '#0ea5e9' }}>Job Opportunities</span>
+                        </h2>
+                    </div>
+                    <Link to="/jobs" style={{ color: '#0ea5e9', textDecoration: 'none', fontWeight: 700, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Browse All Jobs ({recentJobs.length}) <FiArrowRight />
+                    </Link>
+                </div>
+
+                {/* Instant Search and Filter Bar */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '24px',
+                    flexWrap: 'wrap',
+                    background: '#ffffff',
+                    padding: '12px 18px',
+                    borderRadius: '16px',
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
+                        <FiSearch style={{ color: '#94a3b8', fontSize: '1.1rem' }} />
+                        <input
+                            type="text"
+                            placeholder="Search jobs by role (e.g. Developer, Marketing), company (e.g. Toray, TCS), skills, or city..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                width: '100%',
+                                border: 'none',
+                                outline: 'none',
+                                fontSize: '0.92rem',
+                                color: '#0f172a',
+                                background: 'transparent'
+                            }}
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                style={{ border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer' }}
+                            >
+                                <FiX size={16} />
+                            </button>
+                        )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {['All', 'Full Time', 'Part Time', 'Internship'].map((ft) => (
+                            <button
+                                key={ft}
+                                type="button"
+                                onClick={() => setFilterType(ft)}
+                                style={{
+                                    border: 'none',
+                                    padding: '6px 14px',
+                                    borderRadius: '20px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: filterType === ft ? '#0ea5e9' : '#f1f5f9',
+                                    color: filterType === ft ? '#ffffff' : '#64748b',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {ft}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Job Cards Grid */}
+                {(() => {
+                    const term = searchTerm.toLowerCase().trim();
+                    const filtered = recentJobs.filter(job => {
+                        const title = (job.title || job.jobTitle || job.job_title || '').toLowerCase();
+                        const company = (job.companyName || job.company_name || '').toLowerCase();
+                        const location = (job.location || job.job_location || '').toLowerCase();
+                        const skills = (job.required_skills || job.skills || '').toLowerCase();
+                        const matchesSearch = !term || title.includes(term) || company.includes(term) || location.includes(term) || skills.includes(term);
+                        const cleanJobType = (job.jobType || job.job_type || '').toLowerCase().replace(/[\s-]/g, '');
+                        const cleanFilter = filterType.toLowerCase().replace(/[\s-]/g, '');
+                        const matchesType = filterType === 'All' || cleanJobType === cleanFilter;
+                        return matchesSearch && matchesType;
+                    });
+
+                    if (filtered.length === 0) {
+                        return (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '48px 24px',
+                                background: '#ffffff',
+                                borderRadius: '20px',
+                                border: '1.5px dashed #cbd5e1'
+                            }}>
+                                <FiBriefcase size={36} color="#94a3b8" style={{ marginBottom: '12px' }} />
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#334155', margin: '0 0 6px' }}>No matching jobs found</h3>
+                                <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '0 0 16px' }}>Try adjusting your search query or reset filters</p>
+                                <button
+                                    type="button"
+                                    onClick={() => { setSearchTerm(''); setFilterType('All'); }}
+                                    style={{
+                                        padding: '8px 18px',
+                                        borderRadius: '10px',
+                                        background: '#0ea5e9',
+                                        color: 'white',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem'
+                                    }}
+                                >
+                                    Reset Filters
+                                </button>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                            {filtered.map(job => (
+                                <JobCard key={job.id || job.job_id} job={job} />
+                            ))}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* ── DYNAMIC CANDIDATE SUBSCRIPTION PLANS (Posted by Admin) ── */}
@@ -439,10 +582,21 @@ export default function JobSeekerDashboard() {
                         const isCurrentActive = candidatePerks?.planName === (plan.name || plan.plan_name);
                         const isFree = plan.price === 0;
                         const isPopular = plan.is_popular === 1 || plan.is_popular === true || plan.badge_text;
-                        const featuresList = plan.features ? plan.features.split('\n').filter(Boolean).slice(0, 4) : [
-                            `${plan.application_limit === -1 ? 'Unlimited' : (plan.application_limit || 10)} Applications`,
-                            plan.dedicated_support ? 'Dedicated Mentor Support' : 'Standard Visibility'
-                        ];
+                        let featuresList = [];
+                        if (Array.isArray(plan.features)) {
+                            featuresList = plan.features
+                                .filter(f => f && (typeof f === 'string' || f.included !== false))
+                                .map(f => typeof f === 'string' ? f : (f.feature_name + (f.feature_value ? ` (${f.feature_value})` : '')))
+                                .slice(0, 4);
+                        } else if (typeof plan.features === 'string' && plan.features.trim()) {
+                            featuresList = plan.features.split('\n').filter(Boolean).slice(0, 4);
+                        }
+                        if (!featuresList || featuresList.length === 0) {
+                            featuresList = [
+                                `${plan.application_limit === -1 ? 'Unlimited' : (plan.application_limit || 10)} Applications`,
+                                plan.dedicated_support ? 'Dedicated Mentor Support' : 'Standard Visibility'
+                            ];
+                        }
 
                         return (
                             <div
@@ -532,24 +686,6 @@ export default function JobSeekerDashboard() {
                             </div>
                         );
                     })}
-                </div>
-            </div>
-
-            {/* Recent Open Jobs */}
-            <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                        Matching Opportunities
-                    </h2>
-                    <Link to="/jobseeker/jobs" style={{ color: '#0ea5e9', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>
-                        Browse All Jobs →
-                    </Link>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-                    {recentJobs.map(job => (
-                        <JobCard key={job.id} job={job} />
-                    ))}
                 </div>
             </div>
 

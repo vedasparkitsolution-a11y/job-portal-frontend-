@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { verifyToken } = require('../middleware/authMiddleware');
+const { validateExternalUrl } = require('../middleware/securityMiddleware');
 
 // Haversine formula to calculate distance in km between two GPS coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -58,17 +59,34 @@ function autoExpireJobs(callback) {
     );
 }
 
-// Post a New Job (with Geo-Tagging support)
-router.post('/post', verifyToken, (req, res) => {
+// Post a New Job (with Geo-Tagging & Anti-Phishing URL Validation)
+const handlePostJob = (req, res) => {
     if (req.user.role !== 'company' && req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Only recruiters can post jobs' });
     }
 
     const body = req.body;
+
+    // Validate external link inputs against phishing & malicious script URIs
+    if (!validateExternalUrl(body.application_url) || !validateExternalUrl(body.company_website) || !validateExternalUrl(body.googleFormLink)) {
+        return res.status(400).json({ message: 'Invalid or unsafe URL format provided. URLs must begin with http:// or https://' });
+    }
     const jobIdStr = body.job_id || body.jobId || `JOB-${Date.now()}`;
     const status = body.status || 'active';
-    const employerId = req.user.id || body.employer_id;
-    const companyId = body.company_id || req.user.id;
+    
+    // Resolve clean employer & company identifiers
+    let employerId = body.employer_id || body.employerId || '';
+    let companyId = body.company_id || body.companyId || '';
+    const numericCompId = (req.user && typeof req.user.id === 'number') ? req.user.id : (parseInt(req.user?.id, 10) || 0);
+
+    if (req.user && req.user.id && req.user.id !== 'admin_1') {
+        if (!employerId) employerId = `emp_${req.user.id}`;
+        if (!companyId) companyId = `comp_${req.user.id}`;
+    }
+    if (!employerId && companyId) employerId = companyId;
+    if (!companyId && employerId) companyId = employerId;
+    if (!employerId) employerId = String(req.user?.id || 'emp_company');
+    if (!companyId) companyId = String(employerId);
 
     // Coordinate resolution
     let lat = body.latitude || body.lat || '';
@@ -81,22 +99,131 @@ router.post('/post', verifyToken, (req, res) => {
         }
     }
 
-    const query = `
-        INSERT INTO jobs (
-            job_id, employer_id, company_id, companyId, title, job_title, description, job_description,
-            location, job_location, location_type, number_of_openings, experience_type, minimum_experience,
-            maximum_experience, experience, education, skills, required_skills, preferred_skills, gender_preference,
-            minimum_age, maximum_age, salary, minimum_salary, maximum_salary, salary_type, salary_negotiable,
-            responsibilities, working_days, start_time, end_time, shift_type, working_hours, company_name,
-            company_logo, contact_person_name, company_phone, company_email, company_website, about_company,
-            hiring_timeline, hiring_frequency, hiring_priority, building_name, door_number, street, area,
-            city, district, state, country, pincode, benefits, notice_period, joining_date, application_method,
-            application_url, application_email, application_deadline, jobType, googleFormLink, cgpa, application_questions,
-            latitude, longitude, geo_address, geo_radius, status
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-    `;
+    const companyNameClean = (body.company_name || body.companyName || req.user?.companyName || '').trim();
+
+    // Check employer posting quota (Bypass only for Admin)
+    let activeSubId = null;
+    const checkQuotaAndInsert = () => {
+        if (req.user.role === 'admin') {
+            return executeInsert();
+        }
+
+        const userId = req.user.id;
+        const userEmail = req.user.email || '';
+
+        db.get("SELECT value FROM system_settings WHERE key = 'free_employer_job_limit'", (err, settingRow) => {
+            const defaultFreeLimit = parseInt(settingRow?.value || '3', 10);
+
+            // 1. Check for active subscription in both plans and subscription_plans
+            const subQuery = `
+                SELECT s.*, 
+                       COALESCE(p1.plan_name, p2.name, 'Premium Plan') as planName,
+                       COALESCE(p1.posting_limit, p2.job_limit, 20) as job_limit
+                FROM subscriptions s
+                LEFT JOIN plans p1 ON s.planId = p1.id
+                LEFT JOIN subscription_plans p2 ON s.planId = p2.id
+                WHERE (s.userId = ? OR s.companyId = ? OR s.userEmail = ? OR s.companyId = (SELECT company_id FROM employers WHERE employer_id = ? OR email = ?))
+                  AND s.status = 'active' AND s.expiryDate > datetime('now')
+                ORDER BY s.id DESC LIMIT 1
+            `;
+
+            db.get(subQuery, [userId, String(userId), userEmail, String(userId), userEmail], (subErr, sub) => {
+                const targetIds = [String(userId), `comp_${userId}`, `emp_${userId}`];
+                if (companyId) targetIds.push(String(companyId));
+                if (employerId) targetIds.push(String(employerId));
+                if (sub && sub.companyId) targetIds.push(String(sub.companyId));
+
+                const idPlaceholders = targetIds.map(() => '?').join(',');
+                let countQuery = `
+                    SELECT COUNT(*) as postedCount 
+                    FROM jobs 
+                    WHERE ((employer_id IN (${idPlaceholders}) OR company_id IN (${idPlaceholders}) OR CAST(companyId AS CHAR) IN (${idPlaceholders}))
+                `;
+                const countParams = [...targetIds, ...targetIds, ...targetIds];
+
+                if (companyNameClean) {
+                    countQuery += ` OR LOWER(TRIM(company_name)) = LOWER(TRIM(?)))`;
+                    countParams.push(companyNameClean);
+                } else {
+                    countQuery += `)`;
+                }
+
+                countQuery += ` AND (status IS NULL OR status != 'deleted')`;
+
+                // If active subscription, count jobs posted since subscription start
+                if (sub && sub.startDate) {
+                    countQuery += ` AND createdAt >= ?`;
+                    countParams.push(sub.startDate);
+                }
+
+                db.get(countQuery, countParams, (countErr, countRow) => {
+                    let postedCount = countRow ? countRow.postedCount : 0;
+                    if (sub && sub.jobsUsed && sub.jobsUsed > postedCount) {
+                        postedCount = sub.jobsUsed;
+                    }
+
+                    let allowedLimit = defaultFreeLimit;
+                    let isPremium = false;
+
+                    if (sub) {
+                        isPremium = true;
+                        activeSubId = sub.id;
+                        let overrides = {};
+                        try { if (sub.admin_override) overrides = JSON.parse(sub.admin_override); } catch (e) {}
+                        const rawJobLimit = overrides.job_limit !== undefined ? overrides.job_limit : sub.job_limit;
+                        if (rawJobLimit === -1 || rawJobLimit >= 999999) {
+                            allowedLimit = 999999;
+                        } else if (rawJobLimit > 0) {
+                            allowedLimit = rawJobLimit;
+                        }
+                    } else {
+                        // Check if user has legacy isPremium flag
+                        if (req.user.isPremium === 1) {
+                            isPremium = true;
+                            allowedLimit = 50;
+                        }
+                    }
+
+                    // Enforce quota limit (Bypass if unlimited: 999999)
+                    if (allowedLimit < 999999 && postedCount >= allowedLimit) {
+                        const finishMsg = isPremium 
+                            ? `Plan limit reached! You have already posted ${postedCount} of ${allowedLimit} jobs allowed on your current ${sub?.planName || 'active'} plan. Please renew or upgrade your subscription to post more jobs.`
+                            : `Free limit reached! You have already posted ${postedCount} of ${defaultFreeLimit} free jobs. Upgrade your subscription plan to post more jobs.`;
+
+                        return res.status(403).json({
+                            message: finishMsg,
+                            limitReached: true,
+                            postedCount,
+                            allowedLimit,
+                            requiresUpgrade: true,
+                            isPlanFinished: isPremium
+                        });
+                    }
+
+                    // Quota allowed, proceed with insertion
+                    executeInsert();
+                });
+            });
+        });
+    };
+
+    const executeInsert = () => {
+        const query = `
+            INSERT INTO jobs (
+                job_id, employer_id, company_id, companyId, title, job_title, description, job_description,
+                location, job_location, location_type, number_of_openings, experience_type, minimum_experience,
+                maximum_experience, experience, education, skills, required_skills, preferred_skills, gender_preference,
+                minimum_age, maximum_age, salary, minimum_salary, maximum_salary, salary_type, salary_negotiable,
+                responsibilities, working_days, start_time, end_time, shift_type, working_hours, company_name,
+                company_logo, contact_person_name, company_phone, company_email, company_website, about_company,
+                hiring_timeline, hiring_frequency, hiring_priority, building_name, door_number, street, area,
+                city, district, state, country, pincode, benefits, notice_period, joining_date, application_method,
+                application_url, application_email, application_deadline, jobType, googleFormLink, cgpa, application_questions,
+                latitude, longitude, geo_address, geo_radius, status, posted_at, createdAt
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+            )
+        `;
 
     const questionsJson = body.application_questions || body.applicationQuestions
         ? (typeof (body.application_questions || body.applicationQuestions) === 'object' ? JSON.stringify(body.application_questions || body.applicationQuestions) : (body.application_questions || body.applicationQuestions))
@@ -106,7 +233,7 @@ router.post('/post', verifyToken, (req, res) => {
         jobIdStr,
         employerId,
         companyId,
-        req.user.id,
+        numericCompId,
         body.job_title || body.title || 'Untitled Role',
         body.job_title || body.title || 'Untitled Role',
         body.job_description || body.description || '',
@@ -174,20 +301,32 @@ router.post('/post', verifyToken, (req, res) => {
         status
     ];
 
-    db.run(query, params, function (err) {
-        if (err) {
-            console.error('Error inserting job into DB:', err.message);
-            return res.status(500).json({ message: 'Error posting job: ' + err.message });
-        }
-        res.status(201).json({
-            message: status === 'draft' ? 'Draft saved successfully' : 'Job posted with Geo-Tag successfully!',
-            jobId: jobIdStr,
-            id: this.lastID,
-            latitude: lat,
-            longitude: lng
+        db.run(query, params, function (err) {
+            if (err) {
+                console.error('Error inserting job into DB:', err.message);
+                return res.status(500).json({ message: 'Error posting job: ' + err.message });
+            }
+
+            // Increment jobsUsed on active subscription if not draft
+            if (activeSubId && status !== 'draft') {
+                db.run("UPDATE subscriptions SET jobsUsed = jobsUsed + 1 WHERE id = ?", [activeSubId], () => {});
+            }
+
+            res.status(201).json({
+                message: status === 'draft' ? 'Draft saved successfully' : 'Job posted with Geo-Tag successfully!',
+                jobId: jobIdStr,
+                id: this.lastID,
+                latitude: lat,
+                longitude: lng
+            });
         });
-    });
-});
+    };
+
+    checkQuotaAndInsert();
+};
+
+router.post('/post', verifyToken, handlePostJob);
+router.post('/', verifyToken, handlePostJob);
 
 // Update Job Details (with Geo-Tagging support)
 router.put('/:id', verifyToken, (req, res) => {
@@ -220,7 +359,14 @@ router.put('/:id', verifyToken, (req, res) => {
             benefits = ?, notice_period = ?, joining_date = ?, application_method = ?, application_url = ?,
             application_email = ?, application_deadline = ?, job_type = ?, jobType = ?, application_questions = ?,
             latitude = ?, longitude = ?, geo_address = ?, geo_radius = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE (id = ? OR job_id = ?) AND (companyId = ? OR employer_id = ? OR ? = 'admin')
+        WHERE (id = ? OR job_id = ?) AND (
+            companyId = ? 
+            OR employer_id = ? 
+            OR company_id = ? 
+            OR company_id = ? 
+            OR employer_id = ? 
+            OR ? = 'admin'
+        )
     `;
 
     const params = [
@@ -243,7 +389,7 @@ router.put('/:id', verifyToken, (req, res) => {
         questionsJson,
         lat, lng, body.geo_address || body.job_location || body.location || '', body.geo_radius || 25,
         body.status || 'active',
-        jobId, jobId, req.user.id, req.user.id, req.user.role
+        jobId, jobId, req.user.id, req.user.id, body.company_id || '', `comp_${req.user.id}`, `emp_${req.user.id}`, req.user.role
     ];
 
     db.run(query, params, function (err) {
@@ -256,8 +402,16 @@ router.put('/:id', verifyToken, (req, res) => {
 router.put('/:id/status', verifyToken, (req, res) => {
     const { status } = req.body;
     db.run(
-        `UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE (id = ? OR job_id = ?) AND (companyId = ? OR employer_id = ? OR ? = 'admin')`,
-        [status, req.params.id, req.params.id, req.user.id, req.user.id, req.user.role],
+        `UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE (id = ? OR job_id = ?) AND (
+             companyId = ? 
+             OR employer_id = ? 
+             OR company_id = ? 
+             OR company_id = ? 
+             OR employer_id = ? 
+             OR ? = 'admin'
+         )`,
+        [status, req.params.id, req.params.id, req.user.id, req.user.id, req.body.company_id || '', `comp_${req.user.id}`, `emp_${req.user.id}`, req.user.role],
         function (err) {
             if (err) return res.status(500).json({ message: 'Error updating job status' });
             res.json({ message: `Job status updated to ${status}` });
@@ -266,7 +420,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
 });
 
 // Get All Public Active Jobs with optional Geo-Radius filter & distance calculation
-router.get('/all', (req, res) => {
+const handleGetAllJobs = (req, res) => {
     const { lat, lng, radius, search, city } = req.query;
 
     autoExpireJobs(() => {
@@ -332,7 +486,10 @@ router.get('/all', (req, res) => {
             res.json(result);
         });
     });
-});
+};
+
+router.get('/all', handleGetAllJobs);
+router.get('/', handleGetAllJobs);
 
 // Dedicated Geo-Location Nearby Jobs API
 router.get('/nearby', (req, res) => {
@@ -382,19 +539,100 @@ router.get('/nearby', (req, res) => {
     });
 });
 
-// Get Employer Jobs (Requirement 17)
+// Get Employer Jobs (Strictly isolated to the authenticated or requested company)
 router.get('/company', verifyToken, (req, res) => {
     autoExpireJobs(() => {
-        const query = `
-            SELECT j.*, 
-                   (SELECT COUNT(*) FROM applications a WHERE a.jobId = j.id OR a.jobId = j.job_id) as application_count
-            FROM jobs j 
-            WHERE j.companyId = ? OR j.employer_id = ?
-            ORDER BY j.createdAt DESC
-        `;
-        db.all(query, [req.user.id, req.user.id], (err, rows) => {
-            if (err) return res.status(500).json({ message: 'Error fetching company jobs' });
-            res.json(rows);
+        const queryCompanyId = (req.query.companyId || req.query.company_id || req.query.employerId || '').trim();
+        const queryCompanyName = (req.query.companyName || req.query.company_name || '').trim();
+        const userEmail = req.user?.email || '';
+        const userId = req.user?.id || '';
+        const userRole = req.user?.role || '';
+
+        const targetCompanyIds = new Set();
+        const targetCompanyNames = new Set();
+
+        if (queryCompanyId && queryCompanyId !== 'null' && queryCompanyId !== 'undefined') {
+            targetCompanyIds.add(queryCompanyId);
+        }
+        if (queryCompanyName && queryCompanyName !== 'null' && queryCompanyName !== 'undefined') {
+            targetCompanyNames.add(queryCompanyName.toLowerCase().trim());
+        }
+
+        const executeScopedQuery = () => {
+            const conditions = [];
+            const params = [];
+
+            if (targetCompanyIds.size > 0) {
+                const idsArray = Array.from(targetCompanyIds);
+                const placeholders = idsArray.map(() => '?').join(',');
+                conditions.push(`(j.company_id IN (${placeholders}) OR j.employer_id IN (${placeholders}) OR CAST(j.companyId AS CHAR) IN (${placeholders}))`);
+                params.push(...idsArray, ...idsArray, ...idsArray);
+            }
+
+            if (targetCompanyNames.size > 0) {
+                const namesArray = Array.from(targetCompanyNames);
+                const placeholders = namesArray.map(() => 'LOWER(TRIM(?))').join(',');
+                conditions.push(`LOWER(TRIM(j.company_name)) IN (${placeholders})`);
+                params.push(...namesArray);
+            }
+
+            // Fallback: If no company identifiers found and user is admin without specific company query
+            if (conditions.length === 0) {
+                if (userRole === 'admin' && !queryCompanyName && !queryCompanyId) {
+                    db.all(`
+                        SELECT j.*, 
+                               (SELECT COUNT(*) FROM applications a WHERE a.jobId = j.id OR a.jobId = j.job_id) as application_count
+                        FROM jobs j 
+                        ORDER BY j.createdAt DESC, j.id DESC
+                    `, [], (err, rows) => {
+                        if (err) return res.status(500).json({ message: 'Error fetching jobs' });
+                        return res.json(rows || []);
+                    });
+                    return;
+                } else {
+                    return res.json([]);
+                }
+            }
+
+            const sql = `
+                SELECT j.*, 
+                       (SELECT COUNT(*) FROM applications a WHERE a.jobId = j.id OR a.jobId = j.job_id) as application_count
+                FROM jobs j 
+                WHERE ${conditions.join(' OR ')}
+                ORDER BY j.createdAt DESC, j.id DESC
+            `;
+
+            db.all(sql, params, (err, rows) => {
+                if (err) {
+                    console.error('Error fetching company jobs:', err);
+                    return res.status(500).json({ message: 'Error fetching company jobs' });
+                }
+                res.json(rows || []);
+            });
+        };
+
+        // If authenticated user is an employer, enrich target identifiers from their account
+        if (userId && userId !== 'admin_1') {
+            targetCompanyIds.add(String(userId));
+            targetCompanyIds.add(`comp_${userId}`);
+            targetCompanyIds.add(`emp_${userId}`);
+        }
+
+        db.get('SELECT id, email, companyName FROM users WHERE id = ? OR email = ?', [userId, userEmail], (err, u) => {
+            if (u) {
+                if (u.id) targetCompanyIds.add(String(u.id));
+                if (u.companyName) targetCompanyNames.add(u.companyName.toLowerCase().trim());
+            }
+
+            db.get('SELECT company_id, employer_id, company_name FROM companies WHERE company_email = ? OR employer_id = ? OR company_id = ?', 
+                [userEmail, `emp_${userId}`, queryCompanyId || ''], (cErr, comp) => {
+                if (comp) {
+                    if (comp.company_id) targetCompanyIds.add(comp.company_id);
+                    if (comp.employer_id) targetCompanyIds.add(comp.employer_id);
+                    if (comp.company_name) targetCompanyNames.add(comp.company_name.toLowerCase().trim());
+                }
+                executeScopedQuery();
+            });
         });
     });
 });
@@ -402,7 +640,7 @@ router.get('/company', verifyToken, (req, res) => {
 // Get Single Job by ID (candidate view)
 router.get('/:id', (req, res) => {
     const jobId = req.params.id;
-    db.get('SELECT * FROM jobs WHERE id = ? OR job_id = ? OR CAST(id AS TEXT) = ?', [jobId, jobId, String(jobId)], (err, row) => {
+    db.get('SELECT * FROM jobs WHERE id = ? OR job_id = ? OR CAST(id AS CHAR) = ?', [jobId, jobId, String(jobId)], (err, row) => {
         if (err || !row) return res.status(404).json({ message: 'Job not found' });
         res.json(row);
     });

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { API_BASE_URL } from '../config/api';
 import { getOpenJobs } from '../services/jobService';
 import JobCard from '../components/JobCard';
 import JobFilterSidebar from '../components/JobFilterSidebar';
 import LoadingSpinner from '../components/LoadingSpinner';
+import SEOHead from '../components/SEOHead';
 import { 
     FiBriefcase, FiSearch, FiMapPin, FiX, FiNavigation, 
     FiCompass, FiMap, FiCheck, FiSliders, FiExternalLink 
@@ -62,7 +64,7 @@ export default function BrowseJobs() {
         try {
             // Load Public System Settings to check Admin permissions for candidate geo-location
             try {
-                const sRes = await fetch('http://localhost:5000/api/settings/public');
+                const sRes = await fetch(`${API_BASE_URL}/api/settings/public`);
                 if (sRes.ok) {
                     const sData = await sRes.json();
                     setGeoSettings({
@@ -90,7 +92,7 @@ export default function BrowseJobs() {
 
     async function fetchJobs(coords = null, radius = selectedRadius) {
         try {
-            let url = 'http://localhost:5000/api/jobs/all';
+            let url = `${API_BASE_URL}/api/jobs/all`;
             if (coords && coords.lat && coords.lng) {
                 url += `?lat=${coords.lat}&lng=${coords.lng}&radius=${radius || 25}`;
             }
@@ -253,8 +255,33 @@ export default function BrowseJobs() {
 
     if (loading) return <LoadingSpinner />;
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            {
+                '@type': 'ListItem',
+                'position': 1,
+                'name': 'Home',
+                'item': 'http://localhost:5173/'
+            },
+            {
+                '@type': 'ListItem',
+                'position': 2,
+                'name': 'Browse Jobs',
+                'item': 'http://localhost:5173/jobs'
+            }
+        ]
+    };
+
     return (
         <div className="browse-jobs" style={{ paddingBottom: '60px' }}>
+            <SEOHead
+                title="Browse All Verified Job Vacancies | JobConnect"
+                description="Explore thousands of active job listings across Tech, IT, Sales, Marketing, HR & Management in India. Filter by city, salary, skills, or GPS distance."
+                keywords="browse jobs, tech job vacancies, full time jobs, remote work india, software engineer jobs, sales hiring"
+                jsonLd={breadcrumbSchema}
+            />
             <div className="container">
                 <div className="page-header" style={{ marginBottom: '20px' }}>
                     <h1>Browse Jobs</h1>

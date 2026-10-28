@@ -71,10 +71,28 @@ export default function EmployerLoginModal({ isOpen, onClose }) {
 
     const fullMobile = `${countryCode} ${mobileNumber.trim()}`;
 
-    // Handle Mobile Input Validation
+    // Handle Mobile Input Validation (Strict 10 numeric digits only)
     function validateMobile(phone) {
-        const clean = phone.replace(/\D/g, '');
-        return clean.length >= 10 && clean.length <= 12;
+        const clean = (phone || '').replace(/\D/g, '');
+        return clean.length === 10;
+    }
+
+    function handleMobileInput(e) {
+        const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+        setMobileNumber(numericOnly);
+        if (error) setError('');
+    }
+
+    function handleMobileKeyDown(e) {
+        if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) {
+            return;
+        }
+        if (e.ctrlKey || e.metaKey) {
+            return;
+        }
+        if (!/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+        }
     }
 
     // Step 1: Send OTP
@@ -309,10 +327,13 @@ export default function EmployerLoginModal({ isOpen, onClose }) {
                                         <div style={{ position: 'relative', flex: 1 }}>
                                             <input 
                                                 type="tel"
+                                                inputMode="numeric"
+                                                pattern="[0-9]{10}"
                                                 value={mobileNumber}
-                                                onChange={(e) => setMobileNumber(e.target.value)}
-                                                placeholder="98765 43210"
-                                                maxLength={12}
+                                                onChange={handleMobileInput}
+                                                onKeyDown={handleMobileKeyDown}
+                                                placeholder="9876543210"
+                                                maxLength={10}
                                                 required
                                                 autoFocus
                                                 style={{

@@ -166,9 +166,9 @@ export default function CandidateSidebar({ children }) {
             </div>
 
             {/* Main Content Area */}
-            <div className="candidate-main">
+            <div className="candidate-main" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0 }}>
                 {/* Candidate Topbar with Three-Dot Button and Clickable JobConnect Logo (72px) */}
-                <header className="candidate-topbar" style={{ height: '72px', padding: '0 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+                <header className="candidate-topbar" style={{ height: '72px', flexShrink: 0, padding: '0 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                         <button 
                             onClick={() => setSidebarOpen(prev => !prev)}
@@ -295,7 +295,7 @@ export default function CandidateSidebar({ children }) {
                 </header>
 
                 {/* Main Content Area */}
-                <main className="candidate-content" style={{ padding: '28px 36px', overflowY: 'auto' }}>
+                <main className="candidate-content" style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
                     {children}
                 </main>
             </div>

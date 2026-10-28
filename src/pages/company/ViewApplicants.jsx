@@ -8,12 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
     FiArrowLeft, FiDownload, FiUsers, FiFilter,
     FiCalendar, FiEye, FiSearch, FiCheck, FiVideo,
-    FiFileText, FiMapPin, FiClock, FiHelpCircle, FiShield, FiX, FiCheckCircle
+    FiFileText, FiMapPin, FiClock, FiHelpCircle, FiShield, FiX, FiCheckCircle,
+    FiLock, FiUnlock, FiPhone, FiMail
 } from 'react-icons/fi';
 import { useToast } from '../../components/Toast';
 
 export default function ViewApplicants() {
-    const { currentUser, userData } = useAuth();
+    const { currentUser, userData, token } = useAuth();
     const { addToast } = useToast();
 
     const { jobId } = useParams();
@@ -22,6 +23,8 @@ export default function ViewApplicants() {
     const [applicants, setApplicants] = useState([]);
     const [filtered, setFiltered] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [quotaData, setQuotaData] = useState(null);
+    const [unlockingId, setUnlockingId] = useState(null);
 
     // Filters & Sorting
     const [searchQuery, setSearchQuery] = useState('');
@@ -47,11 +50,36 @@ export default function ViewApplicants() {
 
     async function loadData() {
         try {
-            const [jobData, apps] = await Promise.all([
+            const authToken = token || localStorage.getItem('token');
+            const [jobData, apps, quotaRes] = await Promise.all([
                 getJob(jobId),
-                getApplicationsByJob(jobId)
+                getApplicationsByJob(jobId),
+                fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                }).catch(() => null)
             ]);
             setJob(jobData);
+
+            if (quotaRes && quotaRes.ok) {
+                const qData = await quotaRes.json();
+                setQuotaData(qData);
+            }
+
+            if (jobData && userData && userData.role === 'company') {
+                const currentCompName = (userData.companyName || '').toLowerCase().trim();
+                const currentCompId = String(userData.company_id || userData.companyId || currentUser?.uid || '').trim();
+                const jobCompName = (jobData.company_name || jobData.companyName || '').toLowerCase().trim();
+                const jobCompId = String(jobData.company_id || jobData.companyId || '').trim();
+                const jobEmpId = String(jobData.employer_id || jobData.employerId || '').trim();
+
+                const isOwner = Boolean(currentCompName && jobCompName === currentCompName) ||
+                                Boolean(currentCompId && (jobCompId === currentCompId || jobEmpId === currentCompId));
+                if (!isOwner) {
+                    addToast('error', 'Access Denied: This job belongs to another company.');
+                    navigate('/company/manage-jobs');
+                    return;
+                }
+            }
 
             const jobApps = (apps || []).map(app => {
                 let parsedQuestions = app.applicationQuestions || [];
@@ -86,6 +114,49 @@ export default function ViewApplicants() {
             console.error('Failed to load job applicants', err);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleUnlockCandidate(targetCandId) {
+        if (!targetCandId) return;
+        setUnlockingId(targetCandId);
+        try {
+            const authToken = token || localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/employer/unlock-contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ candidateId: targetCandId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                addToast('success', data.message || '🎉 Candidate contact details & resume unlocked!');
+                await loadData();
+                if (selectedCandidate) {
+                    setSelectedCandidate(prev => ({
+                        ...prev,
+                        isUnlocked: true,
+                        isContactPrivate: false,
+                        email: data.candidate?.email || prev.email,
+                        phone: data.candidate?.phone || prev.phone,
+                        address: data.candidate?.address || prev.address,
+                        resumeUrl: data.candidate?.resume_url || prev.resumeUrl,
+                        resumeURL: data.candidate?.resume_url || prev.resumeURL
+                    }));
+                }
+            } else {
+                addToast('error', data.message || 'Failed to unlock contact');
+                if (res.status === 403 && data.requiresUpgrade) {
+                    navigate('/company/subscriptions');
+                }
+            }
+        } catch (err) {
+            console.error('Error unlocking contact:', err);
+            addToast('error', 'Error unlocking candidate contact');
+        } finally {
+            setUnlockingId(null);
         }
     }
 
@@ -243,16 +314,45 @@ export default function ViewApplicants() {
                     </div>
                 </div>
 
-                {/* Candidate Privacy Banner */}
-                <div style={{
-                    marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)',
-                    display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#cbd5e1'
-                }}>
-                    <FiShield style={{ color: '#38bdf8', fontSize: '1.1rem', flexShrink: 0 }} />
-                    <span>
-                        <strong>Candidate Privacy Protected:</strong> Candidate mobile numbers and email addresses remain strictly private. Evaluate applicants via qualifications, experience, and screening answers.
-                    </span>
-                </div>
+                {/* Student Contact & Resume Unlock Quota Banner */}
+                {quotaData && (
+                    <div style={{
+                        marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
+                                <FiUnlock />
+                            </div>
+                            <div>
+                                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>
+                                    Active Plan: {quotaData.activePlanName}
+                                </span>
+                                <strong style={{ display: 'block', color: '#ffffff', fontSize: '0.92rem' }}>
+                                    Student Contact & Resume Unlocks: {quotaData.contactViewLimit === -1 
+                                        ? 'Unlimited Unlocks Enabled 🚀' 
+                                        : `${quotaData.contactsViewed || 0} of ${quotaData.contactViewLimit || 4} Used (${quotaData.contactsRemaining !== undefined ? quotaData.contactsRemaining : 'N/A'} Remaining)`}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => navigate('/company/subscriptions')}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.12)',
+                                color: '#ffffff',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                fontSize: '0.82rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {quotaData.contactViewLimit === -1 ? 'Manage Plan' : 'Get More Unlocks (100 / Unlimited) →'}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Filter and Search Bar */}
@@ -395,18 +495,55 @@ export default function ViewApplicants() {
                                         </div>
 
                                         {/* Key Skills */}
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                                             {(typeof app.skills === 'string' ? app.skills.split(',') : (app.skills || [])).map((s, idx) => (
                                                 <span key={idx} style={{ background: '#f1f5f9', color: '#334155', padding: '3px 9px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600 }}>
                                                     {String(s).trim()}
                                                 </span>
                                             ))}
                                         </div>
+
+                                        {/* Contact Status Badge */}
+                                        <div>
+                                            {app.isUnlocked ? (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                    <FiCheckCircle size={13} /> Contact & Resume Unlocked: {app.phone || app.email || 'Visible'}
+                                                </span>
+                                            ) : (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                    <FiLock size={13} /> Contact & Resume Locked (1 Credit to Unlock)
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Actions */}
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {!app.isUnlocked && (
+                                        <button
+                                            onClick={() => handleUnlockCandidate(app.candidateId || app.candidate_id || app.userId || app.email || app.id)}
+                                            disabled={unlockingId === (app.candidateId || app.candidate_id || app.userId || app.email || app.id)}
+                                            style={{
+                                                padding: '10px 16px',
+                                                borderRadius: '10px',
+                                                border: '1px solid #f59e0b',
+                                                background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+                                                color: '#b45309',
+                                                fontWeight: 800,
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.15)'
+                                            }}
+                                        >
+                                            <FiUnlock size={14} />
+                                            {unlockingId === (app.candidateId || app.candidate_id || app.userId || app.email || app.id) ? 'Unlocking...' : 'Unlock Contact'}
+                                        </button>
+                                    )}
+
                                     <button
                                         onClick={() => setSelectedCandidate(app)}
                                         className="btn btn-primary"
@@ -461,13 +598,144 @@ export default function ViewApplicants() {
                         </div>
 
                         <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            {/* Privacy Notice Banner */}
-                            <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <FiShield style={{ color: '#b45309', fontSize: '1.2rem', flexShrink: 0 }} />
-                                <span style={{ fontSize: '0.85rem', color: '#92400e', fontWeight: 700 }}>
-                                    Candidate contact information (Phone Number, Email, Address) is kept private by system security policy.
-                                </span>
-                            </div>
+                            {/* ── CONTACT & RESUME ACCESS BOX (Dynamic based on Subscription Unlock) ── */}
+                            {selectedCandidate.isUnlocked ? (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                    border: '1.5px solid #86efac',
+                                    borderRadius: '16px',
+                                    padding: '20px',
+                                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #bbf7d0', paddingBottom: '12px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <FiCheckCircle size={16} />
+                                            </div>
+                                            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#14532d' }}>
+                                                Candidate Contact & Resume Unlocked
+                                            </span>
+                                        </div>
+                                        <span style={{ fontSize: '0.78rem', background: '#16a34a', color: '#ffffff', padding: '3px 10px', borderRadius: '20px', fontWeight: 700 }}>
+                                            Plan Credit Used ✓
+                                        </span>
+                                    </div>
+
+                                    {/* Unlocked Contact Details Grid */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                                        <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                                            <span style={{ ...labelStyle, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <FiPhone size={14} /> Phone Number
+                                            </span>
+                                            <a href={`tel:${selectedCandidate.phone || ''}`} style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#047857', textDecoration: 'none' }}>
+                                                {selectedCandidate.phone || 'Available Upon Request'}
+                                            </a>
+                                        </div>
+
+                                        <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                                            <span style={{ ...labelStyle, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <FiMail size={14} /> Email Address
+                                            </span>
+                                            <a href={`mailto:${selectedCandidate.email || ''}`} style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#047857', textDecoration: 'none', wordBreak: 'break-all' }}>
+                                                {selectedCandidate.email || 'Available Upon Request'}
+                                            </a>
+                                        </div>
+
+                                        {selectedCandidate.address && (
+                                            <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                                                <span style={{ ...labelStyle, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <FiMapPin size={14} /> Location / Address
+                                                </span>
+                                                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#047857' }}>
+                                                    {selectedCandidate.address}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                                    border: '1.5px solid #fde68a',
+                                    borderRadius: '16px',
+                                    padding: '20px',
+                                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.08)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#d97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <FiLock size={16} />
+                                            </div>
+                                            <div>
+                                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#78350f' }}>
+                                                    Candidate Contact & Resume Details Locked
+                                                </h4>
+                                                <p style={{ margin: '3px 0 0', fontSize: '0.84rem', color: '#92400e' }}>
+                                                    {quotaData && quotaData.contactsLimit ? (
+                                                        <span>
+                                                            Your active plan allows viewing candidate contacts & resumes. You have <strong>{quotaData.contactsRemaining} credits left</strong> ({quotaData.contactsViewed}/{quotaData.contactsLimit} used).
+                                                        </span>
+                                                    ) : (
+                                                        <span>Unlock this applicant using 1 Student Details & Resume credit from your subscription.</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {quotaData && quotaData.contactsRemaining > 0 ? (
+                                            <button
+                                                onClick={() => handleUnlockCandidate(selectedCandidate.candidateId || selectedCandidate.candidate_id || selectedCandidate.userId || selectedCandidate.email || selectedCandidate.id)}
+                                                disabled={unlockingId === (selectedCandidate.candidateId || selectedCandidate.candidate_id || selectedCandidate.userId || selectedCandidate.email || selectedCandidate.id)}
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                                    color: '#ffffff',
+                                                    border: 'none',
+                                                    padding: '10px 20px',
+                                                    borderRadius: '10px',
+                                                    fontWeight: 800,
+                                                    fontSize: '0.88rem',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.25)'
+                                                }}
+                                            >
+                                                <FiUnlock size={16} />
+                                                {unlockingId === (selectedCandidate.candidateId || selectedCandidate.candidate_id || selectedCandidate.userId || selectedCandidate.email || selectedCandidate.id) ? 'Unlocking...' : 'Unlock Contact & Resume (1 Credit)'}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => navigate('/company/subscriptions')}
+                                                style={{
+                                                    background: '#d97706',
+                                                    color: '#ffffff',
+                                                    border: 'none',
+                                                    padding: '10px 18px',
+                                                    borderRadius: '10px',
+                                                    fontWeight: 800,
+                                                    fontSize: '0.85rem',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Upgrade Plan to Unlock
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Masked Preview */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                                        <div style={{ background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px dashed #fcd34d' }}>
+                                            <span style={{ ...labelStyle, color: '#a16207', fontSize: '0.78rem' }}>Phone Number</span>
+                                            <p style={{ margin: 0, fontWeight: 700, color: '#94a3b8', letterSpacing: '1.5px' }}>••••••••••</p>
+                                        </div>
+                                        <div style={{ background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px dashed #fcd34d' }}>
+                                            <span style={{ ...labelStyle, color: '#a16207', fontSize: '0.78rem' }}>Email Address</span>
+                                            <p style={{ margin: 0, fontWeight: 700, color: '#94a3b8', letterSpacing: '1.5px' }}>••••••@•••••.com</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Candidate Snapshot Box */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
@@ -553,17 +821,25 @@ export default function ViewApplicants() {
                             {/* Resume & Attachments */}
                             <div>
                                 <span style={labelStyle}>Candidate Resume</span>
-                                {selectedCandidate.resumeUrl || selectedCandidate.resumeURL ? (
-                                    <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
-                                        <a href={selectedCandidate.resumeUrl || selectedCandidate.resumeURL} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                            <FiEye /> View Resume
-                                        </a>
-                                        <a href={selectedCandidate.resumeUrl || selectedCandidate.resumeURL} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                            <FiDownload /> Download Resume
-                                        </a>
-                                    </div>
+                                {selectedCandidate.isUnlocked ? (
+                                    (selectedCandidate.resumeUrl || selectedCandidate.resumeURL || selectedCandidate.resume_url) ? (
+                                        <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                                            <a href={selectedCandidate.resumeUrl || selectedCandidate.resumeURL || selectedCandidate.resume_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                                                <FiEye /> View Full Resume
+                                            </a>
+                                            <a href={selectedCandidate.resumeUrl || selectedCandidate.resumeURL || selectedCandidate.resume_url} download className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                                                <FiDownload /> Download Resume
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <p style={{ margin: 0, color: '#16a34a', fontWeight: 700, fontSize: '0.88rem' }}>✓ Digital profile and application answers available above.</p>
+                                    )
                                 ) : (
-                                    <p style={{ margin: 0, color: '#94a3b8', fontStyle: 'italic', fontSize: '0.88rem' }}>Standard digital profile attached.</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                                        <div style={{ background: '#f1f5f9', color: '#64748b', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <FiLock size={14} /> Resume document hidden until contact is unlocked
+                                        </div>
+                                    </div>
                                 )}
                             </div>
 

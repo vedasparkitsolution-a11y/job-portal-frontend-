@@ -84,22 +84,79 @@ export default function AdminPremiumPlans() {
         discount_percentage: 0,
         duration: '30 Days',
         duration_days: 30,
-        posting_limit: 1,
+        posting_limit: 20,
         application_limit: 10,
+        candidate_views_limit: 50,
+        resume_download_limit: 50,
         popular: false,
         recommended: false,
         status: 'active',
         badge_text: '',
         features: [
-            { feature_name: 'Unlimited Candidate Applications', included: true, feature_value: 'Unlimited' },
+            { feature_name: '20 Active Job Postings', included: true, feature_value: '20 Jobs' },
             { feature_name: '30 Day Job Validity', included: true, feature_value: '30 Days' },
+            { feature_name: '50 Student Resumes & Contacts', included: true, feature_value: '50 Students' },
             { feature_name: 'Email Job Notifications', included: true, feature_value: 'Instant' },
-            { feature_name: 'Job Featured on Top', included: false, feature_value: '' },
-            { feature_name: 'Screened Leads', included: false, feature_value: '' },
-            { feature_name: 'Database Access', included: false, feature_value: '' }
+            { feature_name: 'Candidate Database Access', included: true, feature_value: 'Included' }
         ]
     };
     const [planForm, setPlanForm] = useState(initialForm);
+
+    const load1500PlanTemplate = () => {
+        setPlanForm({
+            plan_type: 'employer',
+            plan_name: 'Standard 20 Jobs Pack',
+            description: 'Post up to 20 jobs for 1 month with 50 student resumes & contact details.',
+            original_price: 1999,
+            offer_price: 1500,
+            discount_percentage: 25,
+            duration: '30 Days',
+            duration_days: 30,
+            posting_limit: 20,
+            application_limit: 20,
+            candidate_views_limit: 50,
+            resume_download_limit: 50,
+            popular: false,
+            recommended: true,
+            status: 'active',
+            badge_text: '20 JOBS PACK',
+            features: [
+                { feature_name: '20 Active Job Postings', included: true, feature_value: '20 Jobs' },
+                { feature_name: '30 Day Job Validity', included: true, feature_value: '30 Days' },
+                { feature_name: '50 Student Resumes & Contacts', included: true, feature_value: '50 Students' },
+                { feature_name: 'Instant Applicant Notifications', included: true, feature_value: 'Instant' },
+                { feature_name: 'Candidate Database Access', included: true, feature_value: 'Included' }
+            ]
+        });
+    };
+
+    const load5000PlanTemplate = () => {
+        setPlanForm({
+            plan_type: 'employer',
+            plan_name: 'Unlimited Super Recruiter',
+            description: 'Post unlimited jobs for 1 month with 100 student phone numbers, full details, and resumes.',
+            original_price: 6999,
+            offer_price: 5000,
+            discount_percentage: 28,
+            duration: '30 Days',
+            duration_days: 30,
+            posting_limit: -1,
+            application_limit: 100,
+            candidate_views_limit: 100,
+            resume_download_limit: 100,
+            popular: true,
+            recommended: false,
+            status: 'active',
+            badge_text: 'UNLIMITED JOBS',
+            features: [
+                { feature_name: 'Unlimited Job Postings', included: true, feature_value: 'Unlimited' },
+                { feature_name: '30 Day Extended Validity', included: true, feature_value: '30 Days' },
+                { feature_name: '100 Student Resumes & Contacts', included: true, feature_value: '100 Students' },
+                { feature_name: 'Direct Phone & Email Access', included: true, feature_value: 'Included' },
+                { feature_name: 'Priority Applicant Screening', included: true, feature_value: 'VIP Support' }
+            ]
+        });
+    };
 
     // Offers & Mentors Modals
     const [showOfferModal, setShowOfferModal] = useState(false);
@@ -231,8 +288,10 @@ export default function AdminPremiumPlans() {
                 discount_percentage: plan.discount_percentage || 0,
                 duration: plan.duration || '30 Days',
                 duration_days: plan.duration_days || 30,
-                posting_limit: plan.posting_limit !== undefined ? plan.posting_limit : (plan.job_limit || 1),
+                posting_limit: plan.posting_limit !== undefined ? plan.posting_limit : (plan.job_limit || 20),
                 application_limit: plan.posting_limit !== undefined ? plan.posting_limit : (plan.application_limit || 10),
+                candidate_views_limit: plan.candidate_views_limit !== undefined ? plan.candidate_views_limit : (plan.contact_views || 50),
+                resume_download_limit: plan.resume_download_limit !== undefined ? plan.resume_download_limit : (plan.resume_downloads || 50),
                 popular: Boolean(plan.popular || plan.is_popular),
                 recommended: Boolean(plan.recommended || plan.is_recommended),
                 status: plan.status || 'active',
@@ -254,24 +313,25 @@ export default function AdminPremiumPlans() {
                 plan_type: defaultType,
                 plan_name: '',
                 description: '',
-                original_price: isEmp ? 2499 : 499,
-                offer_price: isEmp ? 1999 : 299,
-                discount_percentage: isEmp ? 20 : 40,
+                original_price: isEmp ? 1999 : 499,
+                offer_price: isEmp ? 1500 : 299,
+                discount_percentage: isEmp ? 25 : 40,
                 duration: '30 Days',
                 duration_days: 30,
-                posting_limit: isEmp ? 1 : 20,
-                application_limit: isEmp ? 1 : 20,
+                posting_limit: isEmp ? 20 : 20,
+                application_limit: isEmp ? 20 : 20,
+                candidate_views_limit: isEmp ? 50 : 0,
+                resume_download_limit: isEmp ? 50 : 0,
                 popular: false,
                 recommended: false,
                 status: 'active',
-                badge_text: '',
+                badge_text: isEmp ? '20 JOBS PACK' : '',
                 features: isEmp ? [
-                    { feature_name: 'Unlimited Candidate Applications', included: true, feature_value: 'Unlimited' },
+                    { feature_name: '20 Active Job Postings', included: true, feature_value: '20 Jobs' },
                     { feature_name: '30 Day Job Validity', included: true, feature_value: '30 Days' },
+                    { feature_name: '50 Student Resumes & Contacts', included: true, feature_value: '50 Students' },
                     { feature_name: 'Job Notifications', included: true, feature_value: 'Instant' },
-                    { feature_name: 'Job Featured on Top', included: false, feature_value: '' },
-                    { feature_name: 'Screened Leads', included: false, feature_value: '' },
-                    { feature_name: 'Candidate Database Access', included: false, feature_value: '' },
+                    { feature_name: 'Candidate Database Access', included: true, feature_value: 'Included' },
                     { feature_name: 'WhatsApp Alerts', included: false, feature_value: '' },
                     { feature_name: 'AI Profile Recommendation', included: false, feature_value: '' }
                 ] : [
@@ -371,7 +431,9 @@ export default function AdminPremiumPlans() {
 
             const payload = {
                 ...planForm,
-                posting_limit: planForm.plan_type === 'candidate' ? Number(planForm.application_limit) : Number(planForm.posting_limit)
+                posting_limit: planForm.plan_type === 'candidate' ? Number(planForm.application_limit) : Number(planForm.posting_limit),
+                candidate_views_limit: Number(planForm.candidate_views_limit !== undefined ? planForm.candidate_views_limit : 50),
+                resume_download_limit: Number(planForm.resume_download_limit !== undefined ? planForm.resume_download_limit : 50)
             };
 
             const res = await fetch(url, {
@@ -796,6 +858,37 @@ export default function AdminPremiumPlans() {
                                         </div>
                                     </div>
 
+                                    {/* Fast Preset Templates (Employer only) */}
+                                    {planForm.plan_type === 'employer' && (
+                                        <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                                                ⚡ 1-Click Fast Templates:
+                                            </span>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={load1500PlanTemplate}
+                                                    style={{
+                                                        padding: '6px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                                                        borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                                    }}
+                                                >
+                                                    ⚡ ₹1,500 Plan (20 Jobs, 50 Resumes)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={load5000PlanTemplate}
+                                                    style={{
+                                                        padding: '6px 12px', background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe',
+                                                        borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                                    }}
+                                                >
+                                                    🚀 ₹5,000 Plan (Unlimited Jobs + 100 Resumes)
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Plan Name */}
                                     <div>
                                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Plan Name *</label>
@@ -876,9 +969,29 @@ export default function AdminPremiumPlans() {
 
                                     {/* Job Limit or Application Limit */}
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                                            {planForm.plan_type === 'employer' ? 'Job Postings Limit (-1 for Unlimited)' : 'Monthly Applications Limit (-1 for Unlimited)'}
-                                        </label>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                                                {planForm.plan_type === 'employer' ? 'Job Postings Limit' : 'Monthly Applications Limit'}
+                                            </label>
+                                            {planForm.plan_type === 'employer' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPlanForm({ ...planForm, posting_limit: planForm.posting_limit === -1 ? 20 : -1 })}
+                                                    style={{
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 800,
+                                                        background: planForm.posting_limit === -1 ? '#7c3aed' : '#f1f5f9',
+                                                        color: planForm.posting_limit === -1 ? '#ffffff' : '#64748b',
+                                                        border: 'none',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {planForm.posting_limit === -1 ? '✓ UNLIMITED SET' : 'Set Unlimited (-1)'}
+                                                </button>
+                                            )}
+                                        </div>
                                         <input
                                             type="number"
                                             value={planForm.plan_type === 'employer' ? planForm.posting_limit : planForm.application_limit}
@@ -890,9 +1003,91 @@ export default function AdminPremiumPlans() {
                                                     setPlanForm({ ...planForm, application_limit: v });
                                                 }
                                             }}
+                                            placeholder="-1 for Unlimited"
                                             style={{ width: '100%', padding: '9px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
                                         />
+                                        {planForm.plan_type === 'employer' && (
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                                {[5, 20, 50, -1].map(limit => (
+                                                    <button
+                                                        key={limit}
+                                                        type="button"
+                                                        onClick={() => setPlanForm({ ...planForm, posting_limit: limit })}
+                                                        style={{
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid #e2e8f0',
+                                                            background: planForm.posting_limit === limit ? '#ede9fe' : '#ffffff',
+                                                            color: planForm.posting_limit === limit ? '#6d28d9' : '#64748b',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {limit === -1 ? 'Unlimited' : `${limit} Jobs`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {/* Student Contact & Resume Unlock Limit (Employer only) */}
+                                    {planForm.plan_type === 'employer' && (
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                                                    Student Contact & Resume Unlocks
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPlanForm({ ...planForm, candidate_views_limit: planForm.candidate_views_limit === -1 ? 50 : -1, resume_download_limit: planForm.candidate_views_limit === -1 ? 50 : -1 })}
+                                                    style={{
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 800,
+                                                        background: planForm.candidate_views_limit === -1 ? '#0ea5e9' : '#f1f5f9',
+                                                        color: planForm.candidate_views_limit === -1 ? '#ffffff' : '#64748b',
+                                                        border: 'none',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {planForm.candidate_views_limit === -1 ? '✓ UNLIMITED SET' : 'Set Unlimited (-1)'}
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={planForm.candidate_views_limit !== undefined ? planForm.candidate_views_limit : 50}
+                                                onChange={e => {
+                                                    const v = Number(e.target.value);
+                                                    setPlanForm({ ...planForm, candidate_views_limit: v, resume_download_limit: v });
+                                                }}
+                                                placeholder="e.g. 50 or 100 (-1 for Unlimited)"
+                                                style={{ width: '100%', padding: '9px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
+                                            />
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                                {[20, 50, 100, -1].map(limit => (
+                                                    <button
+                                                        key={limit}
+                                                        type="button"
+                                                        onClick={() => setPlanForm({ ...planForm, candidate_views_limit: limit, resume_download_limit: limit })}
+                                                        style={{
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid #e2e8f0',
+                                                            background: planForm.candidate_views_limit === limit ? '#e0f2fe' : '#ffffff',
+                                                            color: planForm.candidate_views_limit === limit ? '#0369a1' : '#64748b',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {limit === -1 ? 'Unlimited' : `${limit} Students`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Description */}

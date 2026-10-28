@@ -63,7 +63,10 @@ export default function ApplyJob() {
             setJob(jobData);
 
             // Check duplicate application
-            const applied = await hasUserApplied(currentUser.uid, id);
+            const candidateId = currentUser?.uid || userData?.candidate_id;
+            const candidateEmail = userData?.email || currentUser?.email;
+            const targetJobId = jobData?.job_id || id;
+            const applied = await hasUserApplied(candidateId, targetJobId, candidateEmail);
             if (applied) {
                 setAlreadyApplied(true);
                 setLoading(false);

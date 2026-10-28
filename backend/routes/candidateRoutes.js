@@ -143,6 +143,17 @@ router.post('/profile', (req, res) => {
         const candidateId = existing ? existing.candidate_id : (body.candidate_id || `CAND-${Date.now()}`);
         const profileCompletion = calculateCompletionScore(body);
 
+        // Limit huge raw image strings if uncompressed (> 500KB) to prevent MySQL max_allowed_packet error
+        let rawPhoto = body.profile_photo || body.photo || '';
+        if (typeof rawPhoto === 'string' && rawPhoto.length > 600000) {
+            rawPhoto = ''; // Exceeds safe packet size
+        }
+
+        let rawResume = body.resume_url || body.resumeURL || '';
+        if (typeof rawResume === 'string' && rawResume.length > 500000) {
+            rawResume = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+        }
+
         if (existing) {
             // Update
             const query = `
@@ -153,10 +164,10 @@ router.post('/profile', (req, res) => {
                 WHERE candidate_id = ?
             `;
             const params = [
-                body.full_name || body.name, body.profile_photo || body.photo, body.date_of_birth || body.dob, body.gender,
+                body.full_name || body.name, rawPhoto, body.date_of_birth || body.dob, body.gender,
                 body.city, body.state, body.country, body.pincode, body.address,
                 body.professional_headline, body.current_job_title, body.current_company, body.total_experience, body.experience_type || 'Experienced', body.about_me,
-                body.resume_url || body.resumeURL, body.resume_name || 'Resume.pdf', new Date().toISOString(),
+                rawResume, body.resume_name || 'Resume.pdf', new Date().toISOString(),
                 profileCompletion, candidateId
             ];
 
@@ -193,10 +204,10 @@ router.post('/profile', (req, res) => {
 
                 const params = [
                     finalId, mobile, body.email || '', body.password || '', body.google_account_id || '',
-                    body.full_name || body.name || 'Candidate', body.profile_photo || body.photo || '', body.date_of_birth || '', body.gender || 'Any',
+                    body.full_name || body.name || 'Candidate', rawPhoto, body.date_of_birth || body.dob, body.gender || 'Any',
                     body.city || '', body.state || '', body.country || 'India', body.pincode || '', body.address || '',
                     body.professional_headline || '', body.current_job_title || '', body.current_company || '', body.total_experience || 'Fresher',
-                    body.experience_type || 'Fresher', body.about_me || '', body.resume_url || '', body.resume_name || '', profileCompletion
+                    body.experience_type || 'Fresher', body.about_me || '', rawResume, body.resume_name || '', profileCompletion
                 ];
 
                 db.run(query, params, function (err) {
@@ -410,4 +421,13 @@ router.get('/recommended-jobs/:candidateId', (req, res) => {
     });
 });
 
+// 8. Get Candidate Notifications
+router.get('/notifications', verifyToken, (req, res) => {
+    db.all(`SELECT * FROM candidate_notifications WHERE candidate_id = ? OR candidate_id = ? ORDER BY created_at DESC LIMIT 50`, [req.user.id, req.user.email], (err, rows) => {
+        if (err) return res.status(500).json({ message: 'Error fetching notifications' });
+        res.json(rows || []);
+    });
+});
+
 module.exports = router;
+

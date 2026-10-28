@@ -405,7 +405,7 @@ router.get('/robots.txt', (req, res) => {
 
 // 7. Serve Dynamic Sitemap.xml
 router.get('/sitemap.xml', (req, res) => {
-    db.all("SELECT id, updatedAt, createdAt FROM jobs WHERE status = 'active' OR status = 'approved' LIMIT 100", [], (err, jobs) => {
+    db.all("SELECT id, created_at FROM jobs WHERE status = 'active' OR status = 'approved' OR status = 'open' LIMIT 500", [], (err, jobs) => {
         const baseUrl = 'http://localhost:5173';
         const now = new Date().toISOString().split('T')[0];
 
@@ -416,10 +416,11 @@ router.get('/sitemap.xml', (req, res) => {
         const staticRoutes = [
             { path: '/', priority: '1.0', freq: 'daily' },
             { path: '/jobs', priority: '0.9', freq: 'hourly' },
-            { path: '/pricing', priority: '0.8', freq: 'weekly' },
-            { path: '/blog', priority: '0.7', freq: 'daily' },
-            { path: '/register/jobseeker', priority: '0.7', freq: 'monthly' },
-            { path: '/register/company', priority: '0.7', freq: 'monthly' }
+            { path: '/candidate-plans', priority: '0.7', freq: 'weekly' },
+            { path: '/employer-plans', priority: '0.7', freq: 'weekly' },
+            { path: '/about', priority: '0.6', freq: 'monthly' },
+            { path: '/contact', priority: '0.6', freq: 'monthly' },
+            { path: '/career-analyzer', priority: '0.8', freq: 'weekly' }
         ];
 
         staticRoutes.forEach(r => {
@@ -428,7 +429,13 @@ router.get('/sitemap.xml', (req, res) => {
 
         // Job URLs
         (jobs || []).forEach(j => {
-            const modDate = (j.updatedAt || j.createdAt || now).split('T')[0];
+            const rawDate = j.created_at || j.createdAt || now;
+            let modDate = now;
+            try {
+                modDate = new Date(rawDate).toISOString().split('T')[0];
+            } catch (e) {
+                modDate = now;
+            }
             xml += `  <url>\n    <loc>${baseUrl}/jobs/${j.id}</loc>\n    <lastmod>${modDate}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
         });
 

@@ -205,32 +205,36 @@ export default function ManageUsers() {
         setShowNotifyModal(true);
     };
 
-    const handleSendNotification = (e) => {
+    const handleSendNotification = async (e) => {
         e.preventDefault();
         if (!notifyTitle || !notifyMessage) return;
         setSendingNotify(true);
 
         try {
-            const existingNotifs = JSON.parse(localStorage.getItem('admin_notification_history') || '[]');
-            const newNotif = {
-                id: `NOTIF-${Date.now().toString().slice(-6)}`,
-                title: notifyTitle,
-                message: notifyMessage,
-                channel: notifyChannel,
-                recipient: targetUser ? targetUser.email : `All Users (${activeFilter.toUpperCase()})`,
-                recipientCount: targetUser ? 1 : filteredUsers.length,
-                status: 'Delivered',
-                timestamp: new Date().toLocaleString()
-            };
-            existingNotifs.unshift(newNotif);
-            localStorage.setItem('admin_notification_history', JSON.stringify(existingNotifs));
-        } catch (err) {}
+            await fetch('http://localhost:5000/api/admin/notifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    title: notifyTitle,
+                    message: notifyMessage,
+                    target_group: targetUser ? 'specific' : 'all',
+                    target_user_email: targetUser ? targetUser.email : null,
+                    target_user_id: targetUser ? targetUser.id : null,
+                    channels: notifyChannel
+                })
+            });
+        } catch (err) {
+            console.error('Error dispatching notification via API:', err);
+        }
 
         setTimeout(() => {
             setSendingNotify(false);
             setShowNotifyModal(false);
             if (addToast) addToast('success', targetUser ? `Notification sent to ${targetUser.email}` : 'Broadcast notification dispatched successfully!');
-        }, 600);
+        }, 300);
     };
 
     const handleToggleApprovedAccess = async (user) => {

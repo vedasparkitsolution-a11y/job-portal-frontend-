@@ -24,6 +24,7 @@ function parseArray(val) {
 }
 
 import ApplicationQuestionsModal from '../components/ApplicationQuestionsModal';
+import SEOHead from '../components/SEOHead';
 
 function JobDetailsContent() {
     const { id } = useParams();
@@ -40,16 +41,22 @@ function JobDetailsContent() {
 
     useEffect(() => {
         loadJob();
-    }, [id]);
+    }, [id, currentUser?.uid, currentUser?.email, userRole, userData?.email]);
 
     async function loadJob() {
         setLoading(true);
+        setApplied(false);
         try {
             const data = await getJob(id);
             setJob(data);
             if (currentUser && userRole === 'jobseeker' && data) {
-                const alreadyApplied = await hasUserApplied(currentUser.uid, data.id || data.job_id || id);
+                const targetJobId = data.job_id || data.id || id;
+                const candidateId = currentUser.uid || userData?.candidate_id;
+                const candidateEmail = userData?.email || currentUser.email;
+                const alreadyApplied = await hasUserApplied(candidateId, targetJobId, candidateEmail);
                 setApplied(alreadyApplied);
+            } else {
+                setApplied(false);
             }
         } catch (err) {
             console.error('Failed to load job:', err);
@@ -199,8 +206,59 @@ function JobDetailsContent() {
     const benefitsList = parseArray(job.benefits);
     const companyInitial = String(job.company_name || job.companyName || 'C').charAt(0).toUpperCase();
 
+    const jobTitle = job.job_title || job.title || job.jobTitle || 'Job Opening';
+    const companyName = job.company_name || job.companyName || 'Verified Company';
+    const locationStr = job.job_location || job.location || 'India';
+    const jobDescStr = job.job_description || job.description || job.jobDescription || 'Full job details and requirements on JobConnect.';
+
+    const empTypeMap = {
+        'Full Time': 'FULL_TIME',
+        'Part Time': 'PART_TIME',
+        'Contract': 'CONTRACT',
+        'Internship': 'INTERN',
+        'Remote': 'FULL_TIME',
+        'Freelance': 'CONTRACT'
+    };
+
+    const jobPostingSchema = {
+        '@context': 'https://schema.org/',
+        '@type': 'JobPosting',
+        'title': `${jobTitle} at ${companyName}`,
+        'description': jobDescStr.replace(/<[^>]*>?/gm, '').substring(0, 500),
+        'identifier': {
+            '@type': 'PropertyValue',
+            'name': companyName,
+            'value': String(job.id || id)
+        },
+        'datePosted': job.created_at ? new Date(job.created_at).toISOString() : new Date().toISOString(),
+        'validThrough': deadline ? new Date(deadline).toISOString() : '2027-12-31T23:59:59Z',
+        'employmentType': empTypeMap[job.job_type || job.jobType] || 'FULL_TIME',
+        'hiringOrganization': {
+            '@type': 'Organization',
+            'name': companyName,
+            'sameAs': job.company_website || job.companyWebsite || 'http://localhost:5173',
+            'logo': job.company_logo || job.companyLogo || 'http://localhost:5173/og-image.png'
+        },
+        'jobLocation': {
+            '@type': 'Place',
+            'address': {
+                '@type': 'PostalAddress',
+                'addressLocality': job.city || locationStr,
+                'addressRegion': job.state || '',
+                'addressCountry': job.country || 'IN'
+            }
+        }
+    };
+
     return (
         <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '30px 20px 80px' }}>
+            <SEOHead
+                title={`${jobTitle} at ${companyName} (${locationStr})`}
+                description={`${jobTitle} job opening at ${companyName} in ${locationStr}. Salary: ${job.salary || 'Competitive'}. Apply online now!`}
+                keywords={`${jobTitle}, ${companyName}, jobs in ${locationStr}, ${requiredSkillsList.join(', ')}`}
+                ogType="article"
+                jsonLd={jobPostingSchema}
+            />
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
                 {/* Back Button */}

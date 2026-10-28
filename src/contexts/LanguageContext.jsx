@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 import { translations, SUPPORTED_LANGUAGES } from '../translations';
 
 const LanguageContext = createContext();
@@ -14,7 +15,7 @@ export function LanguageProvider({ children }) {
     useEffect(() => {
         const syncSettings = async () => {
             try {
-                const res = await fetch('http://localhost:5000/api/settings/get').catch(() => null);
+                const res = await fetch(`${API_BASE_URL}/api/settings/get`).catch(() => null);
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data && data.default_language && ['en', 'ta', 'hi', 'te'].includes(data.default_language)) {

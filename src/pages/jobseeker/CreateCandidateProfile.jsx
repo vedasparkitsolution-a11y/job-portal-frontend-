@@ -5,13 +5,53 @@ import { saveCandidateProfile } from '../../services/candidateService';
 import {
     FiUser, FiBookOpen, FiBriefcase, FiCheckCircle, FiFileText,
     FiPlus, FiTrash2, FiEdit3, FiUploadCloud, FiAward, FiArrowLeft,
-    FiArrowRight, FiCheck, FiLock, FiStar, FiMapPin, FiCalendar
+    FiArrowRight, FiCheck, FiLock, FiStar, FiMapPin, FiCalendar,
+    FiEye, FiEyeOff, FiChevronDown
 } from 'react-icons/fi';
 
 const SKILL_CATEGORIES = {
     Technical: ['Python', 'JavaScript', 'React.js', 'Node.js', 'HTML5', 'CSS3', 'SQL', 'Git', 'Java', 'C++', 'Data Structures', 'TypeScript'],
     SoftSkills: ['Communication', 'Teamwork', 'Leadership', 'Problem Solving', 'Time Management', 'Adaptability', 'Critical Thinking']
 };
+
+const INDIAN_STATES = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Andaman and Nicobar Islands',
+    'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Jammu and Kashmir',
+    'Ladakh',
+    'Lakshadweep',
+    'Puducherry'
+];
 
 export default function CreateCandidateProfile() {
     const navigate = useNavigate();
@@ -30,18 +70,22 @@ export default function CreateCandidateProfile() {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    // STEP 1: Personal Information
+    // STEP 1: Personal Information & Password Creation
     const [fullName, setFullName] = useState(userData?.name || userData?.full_name || '');
     const [profilePhoto, setProfilePhoto] = useState(userData?.profile_photo || '');
     const [email, setEmail] = useState(userData?.email || currentUser?.email || '');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [mobileNumber, setMobileNumber] = useState(initialPhone);
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [gender, setGender] = useState('Male');
-    const [city, setCity] = useState('Chennai');
-    const [state, setState] = useState('Tamil Nadu');
-    const [country, setCountry] = useState('India');
-    const [pincode, setPincode] = useState('600001');
-    const [address, setAddress] = useState('');
+    const [city, setCity] = useState(userData?.city || '');
+    const [state, setState] = useState(userData?.state || '');
+    const [country, setCountry] = useState(userData?.country || 'India');
+    const [pincode, setPincode] = useState(userData?.pincode || '');
+    const [address, setAddress] = useState(userData?.address || '');
 
     // STEP 2: Professional Information
     const [experienceType, setExperienceType] = useState('Fresher'); // 'Fresher' or 'Experienced'
@@ -53,30 +97,18 @@ export default function CreateCandidateProfile() {
     const [totalExperience, setTotalExperience] = useState('1–3 Years');
     const [aboutMe, setAboutMe] = useState('');
 
-    // STEP 3: Education List
-    const [educationList, setEducationList] = useState([
-        {
-            qualification: "Bachelor's Degree",
-            degree: 'B.E Computer Science',
-            specialization: 'Software Engineering',
-            institution: 'Anna University College of Engineering',
-            university: 'Anna University',
-            start_year: '2020',
-            end_year: '2024',
-            percentage: '85%',
-            cgpa: '8.5'
-        }
-    ]);
+    // STEP 3: Education List (Clean empty list by default - no hardcoded samples)
+    const [educationList, setEducationList] = useState(Array.isArray(userData?.education) ? userData.education : []);
     const [eduModal, setEduModal] = useState(false);
-    const [eduForm, setEduForm] = useState({ qualification: "Bachelor's Degree", degree: '', specialization: '', institution: '', university: '', start_year: '2020', end_year: '2024', cgpa: '' });
+    const [eduForm, setEduForm] = useState({ qualification: "Bachelor's Degree", degree: '', specialization: '', institution: '', university: '', start_year: '', end_year: '', cgpa: '' });
 
     // STEP 4: Work Experience List
-    const [experienceList, setExperienceList] = useState([]);
+    const [experienceList, setExperienceList] = useState(Array.isArray(userData?.experience) ? userData.experience : []);
     const [expModal, setExpModal] = useState(false);
     const [expForm, setExpForm] = useState({ company_name: '', job_title: '', employment_type: 'Full Time', start_date: '', end_date: '', currently_working: false, location: '', description: '' });
 
     // STEP 5: Skills Tag System
-    const [skills, setSkills] = useState(['Python', 'JavaScript', 'React.js', 'SQL']);
+    const [skills, setSkills] = useState(Array.isArray(userData?.skills) ? userData.skills : []);
     const [skillInput, setSkillInput] = useState('');
 
     // STEP 6: Resume Upload
@@ -130,13 +162,40 @@ export default function CreateCandidateProfile() {
         }
     }
 
-    // Photo Upload Handler (with compression)
+    // Photo Upload Handler (with automatic client-side compression)
     function handlePhotoUpload(e) {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-                setProfilePhoto(event.target.result);
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 360;
+                    const MAX_HEIGHT = 360;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height = Math.round(height * (MAX_WIDTH / width));
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width = Math.round(width * (MAX_HEIGHT / height));
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                    setProfilePhoto(compressedDataUrl);
+                };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -171,10 +230,48 @@ export default function CreateCandidateProfile() {
         }
     }
 
+    // Next Step Handler with Step 1 validation
+    function handleNextStep() {
+        setError('');
+        if (currentStep === 1) {
+            if (!fullName.trim()) {
+                setError('Please enter your Full Name.');
+                return;
+            }
+            if (!email.trim()) {
+                setError('Please enter your Email Address.');
+                return;
+            }
+            if (!password) {
+                setError('Please create a password for your account.');
+                return;
+            }
+            if (password.length < 6) {
+                setError('Password must be at least 6 characters.');
+                return;
+            }
+            if (password !== confirmPassword) {
+                setError('Passwords do not match. Please re-enter.');
+                return;
+            }
+        }
+        setCurrentStep(prev => prev + 1);
+    }
+
     // Final Save Handler (Requirement 14)
     async function handleFinishProfile() {
         if (!fullName || !email) {
             setError('Full Name and Email Address are required.');
+            setCurrentStep(1);
+            return;
+        }
+        if (password && password.length < 6) {
+            setError('Password must be at least 6 characters.');
+            setCurrentStep(1);
+            return;
+        }
+        if (password && password !== confirmPassword) {
+            setError('Passwords do not match.');
             setCurrentStep(1);
             return;
         }
@@ -187,6 +284,7 @@ export default function CreateCandidateProfile() {
             full_name: fullName,
             profile_photo: profilePhoto,
             email,
+            password: password || 'password',
             mobile_number: mobileNumber,
             mobile_verified: 1,
             date_of_birth: dateOfBirth,
@@ -246,7 +344,7 @@ export default function CreateCandidateProfile() {
         { num: 3, name: 'Education', icon: FiBookOpen },
         { num: 4, name: 'Experience', icon: FiAward },
         { num: 5, name: 'Skills', icon: FiStar },
-        { num: 6, name: 'Resume & Preferences', icon: FiFileText },
+        { num: 6, name: 'Resume', icon: FiFileText },
     ];
 
     return (
@@ -283,8 +381,19 @@ export default function CreateCandidateProfile() {
                     </div>
                 </div>
 
-                {/* STEP PROGRESS INDICATOR BAR (Requirement 5) */}
-                <div style={{ background: '#ffffff', borderRadius: '20px', padding: '16px', border: '1px solid #e2e8f0', marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflowX: 'auto' }}>
+                {/* STEP PROGRESS INDICATOR BAR */}
+                <div style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    padding: '12px 14px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+                    marginBottom: '28px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(6, 1fr)',
+                    gap: '8px',
+                    alignItems: 'center'
+                }}>
                     {steps.map(s => {
                         const Icon = s.icon;
                         const isActive = currentStep === s.num;
@@ -293,15 +402,48 @@ export default function CreateCandidateProfile() {
                             <button
                                 key={s.num}
                                 onClick={() => setCurrentStep(s.num)}
+                                title={`Step ${s.num}: ${s.name}`}
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px',
-                                    borderRadius: '12px', border: 'none',
-                                    background: isActive ? '#0ea5e9' : isDone ? '#e0f2fe' : 'transparent',
-                                    color: isActive ? '#ffffff' : isDone ? '#0369a1' : '#64748b',
-                                    fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap'
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '10px 6px',
+                                    borderRadius: '12px',
+                                    border: isActive ? '1.5px solid #0ea5e9' : '1px solid transparent',
+                                    background: isActive ? '#0ea5e9' : isDone ? '#f0f9ff' : '#f8fafc',
+                                    color: isActive ? '#ffffff' : isDone ? '#0284c7' : '#64748b',
+                                    fontWeight: 700,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    width: '100%',
+                                    minWidth: 0,
+                                    boxSizing: 'border-box'
                                 }}
                             >
-                                <Icon size={16} /> Step {s.num}: {s.name} {isDone && '✓'}
+                                <span style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: isActive ? 'rgba(255,255,255,0.25)' : isDone ? '#bae6fd' : '#e2e8f0',
+                                    color: isActive ? '#ffffff' : isDone ? '#0369a1' : '#64748b',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    flexShrink: 0
+                                }}>
+                                    {isDone ? '✓' : s.num}
+                                </span>
+                                <span style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {s.name}
+                                </span>
                             </button>
                         );
                     })}
@@ -352,6 +494,54 @@ export default function CreateCandidateProfile() {
                                 </div>
 
                                 <div>
+                                    <label style={labelStyle}>Create Password *</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input 
+                                            type={showPassword ? 'text' : 'password'} 
+                                            value={password} 
+                                            onChange={e => setPassword(e.target.value)} 
+                                            placeholder="Min 6 characters" 
+                                            style={{ ...inputStyle, paddingRight: '44px' }} 
+                                            required 
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            style={{
+                                                position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                                                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center'
+                                            }}
+                                        >
+                                            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>Confirm Password *</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input 
+                                            type={showConfirmPassword ? 'text' : 'password'} 
+                                            value={confirmPassword} 
+                                            onChange={e => setConfirmPassword(e.target.value)} 
+                                            placeholder="Re-enter password" 
+                                            style={{ ...inputStyle, paddingRight: '44px' }} 
+                                            required 
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            style={{
+                                                position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                                                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center'
+                                            }}
+                                        >
+                                            {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
                                     <label style={labelStyle}>
                                         Verified Mobile Number * <FiLock style={{ color: '#10b981', marginLeft: '4px' }} />
                                     </label>
@@ -365,11 +555,14 @@ export default function CreateCandidateProfile() {
 
                                 <div>
                                     <label style={labelStyle}>Gender</label>
-                                    <select value={gender} onChange={e => setGender(e.target.value)} style={inputStyle}>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Other">Other</option>
-                                    </select>
+                                    <div style={{ position: 'relative' }}>
+                                        <select value={gender} onChange={e => setGender(e.target.value)} style={selectStyle}>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                        <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -379,7 +572,25 @@ export default function CreateCandidateProfile() {
 
                                 <div>
                                     <label style={labelStyle}>State</label>
-                                    <input type="text" value={state} onChange={e => setState(e.target.value)} placeholder="Enter state" style={inputStyle} />
+                                    <div style={{ position: 'relative' }}>
+                                        <select 
+                                            value={state} 
+                                            onChange={e => setState(e.target.value)} 
+                                            style={{
+                                                ...selectStyle,
+                                                color: state ? '#0f172a' : '#94a3b8'
+                                            }}
+                                        >
+                                            <option value="" style={{ color: '#94a3b8' }}>Select State</option>
+                                            {INDIAN_STATES.map((st) => (
+                                                <option key={st} value={st} style={{ color: '#0f172a' }}>{st}</option>
+                                            ))}
+                                            {state && !INDIAN_STATES.includes(state) && (
+                                                <option value={state} style={{ color: '#0f172a' }}>{state}</option>
+                                            )}
+                                        </select>
+                                        <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -390,7 +601,7 @@ export default function CreateCandidateProfile() {
 
                             <div style={{ marginTop: '20px' }}>
                                 <label style={labelStyle}>Full Address</label>
-                                <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Enter full address" rows="2" style={inputStyle} />
+                                <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Enter full address" rows="2" style={{ ...inputStyle, height: 'auto', minHeight: '80px', resize: 'vertical' }} />
                             </div>
                         </div>
                     )}
@@ -455,12 +666,15 @@ export default function CreateCandidateProfile() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                         <div>
                                             <label style={labelStyle}>Current Academic / Student Status *</label>
-                                            <select value={fresherStatus} onChange={e => setFresherStatus(e.target.value)} style={inputStyle}>
-                                                <option value="Final Year Student">Final Year Student</option>
-                                                <option value="Recent Graduate (2024/2025)">Recent Graduate (2024/2025)</option>
-                                                <option value="Looking for Internship / First Job">Looking for Internship / First Job</option>
-                                                <option value="Pre-Final Year Student">Pre-Final Year Student</option>
-                                            </select>
+                                            <div style={{ position: 'relative' }}>
+                                                <select value={fresherStatus} onChange={e => setFresherStatus(e.target.value)} style={selectStyle}>
+                                                    <option value="Final Year Student">Final Year Student</option>
+                                                    <option value="Recent Graduate (2024/2025)">Recent Graduate (2024/2025)</option>
+                                                    <option value="Looking for Internship / First Job">Looking for Internship / First Job</option>
+                                                    <option value="Pre-Final Year Student">Pre-Final Year Student</option>
+                                                </select>
+                                                <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                            </div>
                                         </div>
 
                                         <div>
@@ -507,13 +721,16 @@ export default function CreateCandidateProfile() {
 
                                         <div style={{ gridColumn: 'span 2' }}>
                                             <label style={labelStyle}>Total Experience *</label>
-                                            <select value={totalExperience} onChange={e => setTotalExperience(e.target.value)} style={inputStyle}>
-                                                <option value="0–1 Years">0–1 Years</option>
-                                                <option value="1–3 Years">1–3 Years</option>
-                                                <option value="3–5 Years">3–5 Years</option>
-                                                <option value="5–10 Years">5–10 Years</option>
-                                                <option value="10+ Years">10+ Years</option>
-                                            </select>
+                                            <div style={{ position: 'relative' }}>
+                                                <select value={totalExperience} onChange={e => setTotalExperience(e.target.value)} style={selectStyle}>
+                                                    <option value="0–1 Years">0–1 Years</option>
+                                                    <option value="1–3 Years">1–3 Years</option>
+                                                    <option value="3–5 Years">3–5 Years</option>
+                                                    <option value="5–10 Years">5–10 Years</option>
+                                                    <option value="10+ Years">10+ Years</option>
+                                                </select>
+                                                <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -528,7 +745,7 @@ export default function CreateCandidateProfile() {
                                     onChange={e => setAboutMe(e.target.value)}
                                     placeholder="Enter career objective / professional summary..."
                                     rows="4"
-                                    style={inputStyle}
+                                    style={{ ...inputStyle, height: 'auto', minHeight: '110px', resize: 'vertical' }}
                                 />
                             </div>
                         </div>
@@ -742,25 +959,31 @@ export default function CreateCandidateProfile() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                 <div>
                                     <label style={labelStyle}>Work Mode</label>
-                                    <select value={workMode} onChange={e => setWorkMode(e.target.value)} style={inputStyle}>
-                                        <option value="On-site">On-site</option>
-                                        <option value="Remote">Remote</option>
-                                        <option value="Hybrid">Hybrid</option>
-                                        <option value="Any">Any</option>
-                                    </select>
+                                    <div style={{ position: 'relative' }}>
+                                        <select value={workMode} onChange={e => setWorkMode(e.target.value)} style={selectStyle}>
+                                            <option value="On-site">On-site</option>
+                                            <option value="Remote">Remote</option>
+                                            <option value="Hybrid">Hybrid</option>
+                                            <option value="Any">Any</option>
+                                        </select>
+                                        <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                    </div>
                                 </div>
 
                                 <div>
                                     <label style={labelStyle}>Notice Period</label>
-                                    <select value={noticePeriod} onChange={e => setNoticePeriod(e.target.value)} style={inputStyle}>
-                                        <option value="Immediate Joiner">Immediate Joiner</option>
-                                        <option value="7 Days">7 Days</option>
-                                        <option value="15 Days">15 Days</option>
-                                        <option value="30 Days">30 Days</option>
-                                        <option value="60 Days">60 Days</option>
-                                        <option value="90 Days">90 Days</option>
-                                        <option value="Negotiable">Negotiable</option>
-                                    </select>
+                                    <div style={{ position: 'relative' }}>
+                                        <select value={noticePeriod} onChange={e => setNoticePeriod(e.target.value)} style={selectStyle}>
+                                            <option value="Immediate Joiner">Immediate Joiner</option>
+                                            <option value="7 Days">7 Days</option>
+                                            <option value="15 Days">15 Days</option>
+                                            <option value="30 Days">30 Days</option>
+                                            <option value="60 Days">60 Days</option>
+                                            <option value="90 Days">90 Days</option>
+                                            <option value="Negotiable">Negotiable</option>
+                                        </select>
+                                        <FiChevronDown size={18} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -785,7 +1008,7 @@ export default function CreateCandidateProfile() {
                         ) : <div />}
 
                         {currentStep < 6 ? (
-                            <button className="btn btn-primary" onClick={() => setCurrentStep(currentStep + 1)} style={{ padding: '12px 28px', fontWeight: 800 }}>
+                            <button className="btn btn-primary" onClick={handleNextStep} style={{ padding: '12px 28px', fontWeight: 800 }}>
                                 Next Step <FiArrowRight />
                             </button>
                         ) : (
@@ -811,10 +1034,23 @@ const labelStyle = {
 
 const inputStyle = {
     width: '100%',
+    height: '48px',
     padding: '12px 16px',
     borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    fontSize: '0.92rem',
+    border: '1.5px solid #cbd5e1',
+    fontSize: '0.95rem',
+    fontWeight: 500,
+    color: '#0f172a',
     outline: 'none',
-    background: '#ffffff'
+    background: '#ffffff',
+    boxSizing: 'border-box'
+};
+
+const selectStyle = {
+    ...inputStyle,
+    paddingRight: '38px',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    cursor: 'pointer'
 };

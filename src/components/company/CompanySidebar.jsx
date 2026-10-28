@@ -124,36 +124,6 @@ export default function CompanySidebar({ onClose }) {
                     >
                         <FiPlus size={16} /> Post New Job
                     </button>
-
-                    {/* Prominent Subscription Plans Button */}
-                    <button 
-                        onClick={() => navigate('/company/subscriptions')}
-                        style={{
-                            background: '#f5f3ff',
-                            border: '1.5px solid #ddd6fe',
-                            borderRadius: '10px',
-                            padding: '10px',
-                            color: '#7c3aed',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            fontSize: '0.88rem',
-                            transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = '#ede9fe';
-                            e.currentTarget.style.borderColor = '#c4b5fd';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = '#f5f3ff';
-                            e.currentTarget.style.borderColor = '#ddd6fe';
-                        }}
-                    >
-                        <FiZap style={{ color: '#f59e0b' }} /> Subscription Plans
-                    </button>
                 </div>
 
                 {/* Navigation Menu */}

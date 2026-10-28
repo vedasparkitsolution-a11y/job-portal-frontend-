@@ -23,12 +23,22 @@ export default function RegisterJobSeeker() {
     }, [searchParams]);
 
     function handleChange(e) {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        let finalVal = value;
+        if (name === 'phone') {
+            finalVal = value.replace(/\D/g, '').slice(0, 10);
+        }
+        setFormData({ ...formData, [name]: finalVal });
     }
 
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
+
+        const cleanPhone = (formData.phone || '').replace(/\D/g, '');
+        if (cleanPhone.length !== 10) {
+            return setError('Please enter a valid 10-digit mobile number.');
+        }
 
         if (formData.password !== formData.confirmPassword) {
             return setError('Passwords do not match.');
@@ -71,7 +81,22 @@ export default function RegisterJobSeeker() {
                         </div>
                         <div className="form-group">
                             <label><FiPhone /> Phone</label>
-                            <input name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 9876543210" required />
+                            <input 
+                                name="phone" 
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]{10}"
+                                maxLength={10}
+                                value={formData.phone} 
+                                onChange={handleChange} 
+                                onKeyDown={(e) => {
+                                    if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) return;
+                                    if (e.ctrlKey || e.metaKey) return;
+                                    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                                }}
+                                placeholder="9876543210" 
+                                required 
+                            />
                         </div>
                     </div>
                     <div className="form-row">

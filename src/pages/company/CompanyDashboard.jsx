@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { getJobsByCompany } from '../../services/jobService';
 import { getApplicationsByCompany } from '../../services/applicationService';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -90,12 +91,12 @@ export default function CompanyDashboard() {
             const [jobs, apps, subRes, plansRes, quotaRes] = await Promise.all([
                 getJobsByCompany(compId, compName).catch(() => []),
                 getApplicationsByCompany(compId, compName).catch(() => []),
-                fetch('http://localhost:5000/api/subscriptions/status', {
+                fetch(`${API_BASE_URL}/api/subscriptions/status`, {
                     headers: { 'Authorization': `Bearer ${activeToken}` }
                 }).then(res => res.ok ? res.json() : null).catch(() => null),
-                fetch('http://localhost:5000/api/plans?plan_type=employer&status=active')
+                fetch(`${API_BASE_URL}/api/plans?plan_type=employer&status=active`)
                     .then(res => res.ok ? res.json() : null).catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+                fetch(`${API_BASE_URL}/api/subscriptions/employer-quota`, {
                     headers: { 'Authorization': `Bearer ${activeToken}` }
                 }).then(res => res.ok ? res.json() : null).catch(() => null)
             ]);

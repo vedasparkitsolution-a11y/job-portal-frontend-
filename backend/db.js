@@ -10,10 +10,62 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-let activeEngine = 'sqlite'; // 'supabase' | 'mysql' | 'sqlite'
+const hasSupabase = process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.com') && !process.env.DATABASE_URL.includes('[YOUR-PASSWORD]');
+
+let activeEngine = hasSupabase ? 'supabase' : 'sqlite'; // 'supabase' | 'mysql' | 'sqlite'
 let sqliteDb = null;
 let mysqlPool = null;
-let pgPool = null;
+let lastError = null;
+let pgPool = hasSupabase ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000
+}) : null;
+
+function normalizePgRow(row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+    for (const key of Object.keys(row)) {
+        const val = row[key];
+        const lower = key.toLowerCase();
+        if (lower === 'postedcount') {
+            row.postedCount = Number(val);
+        } else if (lower === 'planname') {
+            row.planName = val;
+        } else if (lower === 'jobsused') {
+            row.jobsUsed = Number(val);
+        } else if (lower === 'expirydate') {
+            row.expiryDate = val;
+        } else if (lower === 'startdate') {
+            row.startDate = val;
+        } else if (lower === 'contactsviewed') {
+            row.contactsViewed = Number(val);
+        } else if (lower === 'createdat') {
+            row.createdAt = val;
+        } else if (lower === 'companyname') {
+            row.companyName = val;
+        } else if (lower === 'hrname') {
+            row.hrName = val;
+        } else if (lower === 'userid') {
+            row.userId = val;
+        } else if (lower === 'companyid') {
+            row.companyId = val;
+        } else if (lower === 'jobid') {
+            row.jobId = val;
+        } else if (lower === 'jobtype') {
+            row.jobType = val;
+        }
+    }
+    return new Proxy(row, {
+        get(target, prop, receiver) {
+            if (typeof prop === 'string') {
+                if (prop in target) return target[prop];
+                const lower = prop.toLowerCase();
+                if (lower in target) return target[lower];
+            }
+            return Reflect.get(target, prop, receiver);
+        }
+    });
+}
 
 function translateSql(sql, engine) {
     if (!sql) return sql;
@@ -33,7 +85,8 @@ function translateSql(sql, engine) {
             .replace(/INSERT\s+IGNORE\s+INTO/gi, 'INSERT INTO')
             .replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO')
             .replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO')
-            .replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP');
+            .replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP')
+            .replace(/\bcreatedAt\b/g, 'createdat');
 
         let idx = 1;
         pgSql = pgSql.replace(/\?/g, () => `$${idx++}`);
@@ -76,6 +129,12 @@ const candidatePool = mysql.createPool({
 });
 
 const db = {
+    get activeEngine() {
+        return activeEngine;
+    },
+    get lastError() {
+        return lastError;
+    },
     get pool() {
         return activeEngine === 'supabase' ? pgPool : mysqlPool;
     },
@@ -88,7 +147,7 @@ const db = {
             const cleanedSql = translateSql(sql, 'supabase');
             pgPool.query(cleanedSql, params || [], (err, results) => {
                 if (err) return cb ? cb(err) : null;
-                const rows = results ? results.rows : [];
+                const rows = results ? results.rows.map(normalizePgRow) : [];
                 rows.insertId = rows[0]?.id || null;
                 rows.affectedRows = results ? results.rowCount : 0;
                 if (cb) cb(null, rows, results);
@@ -123,7 +182,7 @@ const db = {
             const cleanedSql = translateSql(sql, 'supabase');
             pgPool.query(cleanedSql, params || [], (err, results) => {
                 if (err) return cb ? cb(err) : null;
-                const row = (results && Array.isArray(results.rows) && results.rows.length > 0) ? results.rows[0] : null;
+                const row = (results && Array.isArray(results.rows) && results.rows.length > 0) ? normalizePgRow(results.rows[0]) : null;
                 if (cb) cb(null, row);
             });
         } else if (activeEngine === 'mysql' && mysqlPool) {
@@ -151,7 +210,7 @@ const db = {
             const cleanedSql = translateSql(sql, 'supabase');
             pgPool.query(cleanedSql, params || [], (err, results) => {
                 if (err) return cb ? cb(err) : null;
-                const rows = results ? results.rows : [];
+                const rows = results ? results.rows.map(normalizePgRow) : [];
                 if (cb) cb(null, rows);
             });
         } else if (activeEngine === 'mysql' && mysqlPool) {
@@ -1326,21 +1385,31 @@ const hasValidSupabaseUrl = process.env.DATABASE_URL &&
     !process.env.DATABASE_URL.includes('[YOUR-PASSWORD]');
 
 if (hasValidSupabaseUrl) {
-    pgPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000
-    });
+    if (!pgPool) {
+        pgPool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+            max: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 15000
+        });
+    }
 
     pgPool.connect((err, client, release) => {
         if (!err && client) {
             activeEngine = 'supabase';
+            lastError = null;
             console.log('✅ Connected to Supabase PostgreSQL database!');
             release();
-            initSchemaAndSeeds();
+            if (!process.env.VERCEL) {
+                initSchemaAndSeeds();
+            }
         } else {
-            console.warn('⚠️ Supabase connection failed:', err ? err.message : 'Unknown error');
-            fallbackToMysqlOrSqlite();
+            lastError = err ? err.message : 'Unknown connect error';
+            console.warn('⚠️ Supabase connection failed:', lastError);
+            if (!process.env.VERCEL) {
+                fallbackToMysqlOrSqlite();
+            }
         }
     });
 } else {

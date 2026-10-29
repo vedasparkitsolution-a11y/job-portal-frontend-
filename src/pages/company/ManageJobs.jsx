@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { getJobsByCompany, deleteJob, updateJobStatus, duplicateJob } from '../../services/jobService';
 import { getApplicationsByCompany } from '../../services/applicationService';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -37,7 +38,7 @@ export default function ManageJobs() {
                 } catch (e) {}
             }
             if (!token) return;
-            const res = await fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/employer-quota`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -140,7 +141,7 @@ export default function ManageJobs() {
                     </div>
                     {quotaData && !quotaData.canPostMore ? (
                         <Link to="/company/subscriptions" className="btn btn-primary" style={{ padding: '12px 24px', fontWeight: 800, background: '#dc2626', borderColor: '#dc2626' }}>
-                            ⚡ Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                            ⚡ Limit Reached ({quotaData.postedCount ?? 0}/{quotaData.allowedLimit ?? 3}) — Upgrade Plan
                         </Link>
                     ) : (
                         <Link to="/company/post-job" className="btn btn-primary" style={{ padding: '12px 24px', fontWeight: 800 }}>

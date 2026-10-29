@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { createJob } from '../../services/jobService';
+import { API_BASE_URL } from '../../config/api';
 import { generateDynamicQuestions } from '../../utils/questionGenerator';
 import {
     FiArrowLeft, FiPlus, FiX, FiCheck, FiSave, FiEye,
@@ -221,7 +222,7 @@ export default function PostJob() {
 
     async function fetchGeoPermissions() {
         try {
-            const res = await fetch('http://localhost:5000/api/settings/public');
+            const res = await fetch(`${API_BASE_URL}/api/settings/public`);
             if (res.ok) {
                 const data = await res.json();
                 setGeoEmployerAccess(data.geotag_employer_access !== 'false' && data.geotag_enabled !== 'false');
@@ -238,7 +239,7 @@ export default function PostJob() {
                 } catch (e) {}
             }
             if (!token) return;
-            const res = await fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/employer-quota`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -544,7 +545,7 @@ export default function PostJob() {
                         </button>
                         {quotaData && !quotaData.canPostMore ? (
                             <button type="button" onClick={() => setIsUpgradeModalOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 24px', background: '#dc2626', borderColor: '#dc2626' }}>
-                                ⚡ Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                                ⚡ Limit Reached ({quotaData.postedCount ?? 0}/{quotaData.allowedLimit ?? 3}) — Upgrade Plan
                             </button>
                         ) : (
                             <button type="button" onClick={handlePublish} className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 24px' }}>
@@ -1541,7 +1542,7 @@ export default function PostJob() {
 
                             {quotaData && !quotaData.canPostMore ? (
                                 <button type="button" onClick={() => setIsUpgradeModalOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 800, background: '#dc2626', borderColor: '#dc2626' }}>
-                                    ⚡ Free Limit Reached ({quotaData.postedCount}/{quotaData.allowedLimit}) — Upgrade Plan
+                                    ⚡ Free Limit Reached ({quotaData.postedCount ?? 0}/{quotaData.allowedLimit ?? 3}) — Upgrade Plan
                                 </button>
                             ) : (
                                 <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 800 }}>

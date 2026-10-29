@@ -157,9 +157,10 @@ const handlePostJob = (req, res) => {
                 }
 
                 db.get(countQuery, countParams, (countErr, countRow) => {
-                    let postedCount = countRow ? countRow.postedCount : 0;
-                    if (sub && sub.jobsUsed && sub.jobsUsed > postedCount) {
-                        postedCount = sub.jobsUsed;
+                    let postedCount = countRow ? Number(countRow.postedCount ?? countRow.postedcount ?? 0) : 0;
+                    if (isNaN(postedCount)) postedCount = 0;
+                    if (sub && (sub.jobsUsed || sub.jobsused) && Number(sub.jobsUsed || sub.jobsused) > postedCount) {
+                        postedCount = Number(sub.jobsUsed || sub.jobsused);
                     }
 
                     let allowedLimit = defaultFreeLimit;
@@ -439,7 +440,7 @@ const handleGetAllJobs = (req, res) => {
         query += ` ORDER BY posted_at DESC, createdAt DESC`;
 
         db.all(query, params, (err, rows) => {
-            if (err) return res.status(500).json({ message: 'Error fetching jobs' });
+            if (err) return res.status(500).json({ message: 'Error fetching jobs', error: err.message, sql: query });
 
             let result = (rows || []).map(j => {
                 let jobLat = j.latitude;

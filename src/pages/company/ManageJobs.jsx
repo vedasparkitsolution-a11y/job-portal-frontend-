@@ -57,22 +57,7 @@ export default function ManageJobs() {
                 getApplicationsByCompany(companyId, companyName)
             ]);
 
-            // Strict double-layer isolation: filter jobs strictly belonging to this company
-            const currentCompNameLower = companyName.toLowerCase().trim();
-            const currentCompId = String(companyId || '').trim();
-
-            const scopedJobs = (data || []).filter(j => {
-                if (!currentCompNameLower && !currentCompId) return true;
-                const jCompName = (j.company_name || j.companyName || '').toLowerCase().trim();
-                const jCompId = String(j.company_id || j.companyId || '').trim();
-                const jEmpId = String(j.employer_id || j.employerId || '').trim();
-                
-                const matchesName = Boolean(currentCompNameLower && jCompName && (jCompName === currentCompNameLower));
-                const matchesId = Boolean(currentCompId && (jCompId === currentCompId || jEmpId === currentCompId));
-                return matchesName || matchesId;
-            });
-
-            setJobs(scopedJobs);
+            setJobs(data || []);
             setApplications(apps || []);
         } catch (err) {
             console.error(err);

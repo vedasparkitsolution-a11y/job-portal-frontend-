@@ -73,7 +73,7 @@ export default function PostJob() {
     const [workingHours, setWorkingHours] = useState('8 hours/day');
 
     // Section 6: About Company (Auto-loaded from Employer Company Profile - Requirement 7)
-    const companyName = userData?.companyName || 'Your Company Name';
+    const companyName = userData?.companyName || userData?.companyname || userData?.company_name || userData?.name || 'Your Company Name';
     const companyLogo = userData?.logoURL || userData?.companyLogo || '';
     const contactPersonName = userData?.contactPersonName || userData?.hrName || 'Recruiter';
     const companyPhone = userData?.mobileNumber || userData?.companyPhone || '';

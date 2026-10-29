@@ -566,7 +566,7 @@ router.get('/company', verifyToken, (req, res) => {
             if (targetCompanyIds.size > 0) {
                 const idsArray = Array.from(targetCompanyIds);
                 const placeholders = idsArray.map(() => '?').join(',');
-                conditions.push(`(j.company_id IN (${placeholders}) OR j.employer_id IN (${placeholders}) OR CAST(j.companyId AS CHAR) IN (${placeholders}))`);
+                conditions.push(`(j.company_id IN (${placeholders}) OR j.employer_id IN (${placeholders}) OR CAST(j.companyId AS VARCHAR) IN (${placeholders}))`);
                 params.push(...idsArray, ...idsArray, ...idsArray);
             }
 
@@ -582,7 +582,7 @@ router.get('/company', verifyToken, (req, res) => {
                 if (userRole === 'admin' && !queryCompanyName && !queryCompanyId) {
                     db.all(`
                         SELECT j.*, 
-                               (SELECT COUNT(*) FROM applications a WHERE a.jobId = j.id OR a.jobId = j.job_id) as application_count
+                               (SELECT COUNT(*) FROM applications a WHERE CAST(a.jobId AS VARCHAR) = CAST(j.id AS VARCHAR) OR a.jobId = j.job_id) as application_count
                         FROM jobs j 
                         ORDER BY j.createdAt DESC, j.id DESC
                     `, [], (err, rows) => {
@@ -597,7 +597,7 @@ router.get('/company', verifyToken, (req, res) => {
 
             const sql = `
                 SELECT j.*, 
-                       (SELECT COUNT(*) FROM applications a WHERE a.jobId = j.id OR a.jobId = j.job_id) as application_count
+                       (SELECT COUNT(*) FROM applications a WHERE CAST(a.jobId AS VARCHAR) = CAST(j.id AS VARCHAR) OR a.jobId = j.job_id) as application_count
                 FROM jobs j 
                 WHERE ${conditions.join(' OR ')}
                 ORDER BY j.createdAt DESC, j.id DESC

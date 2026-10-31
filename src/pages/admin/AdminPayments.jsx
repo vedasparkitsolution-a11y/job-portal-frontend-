@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+import { API_BASE_URL } from '../../config/api';
 import { 
     FiSearch, FiCheckCircle, FiXCircle, FiClock, FiDollarSign,
     FiAlertCircle, FiFilter, FiDownload, FiCheck, FiX, FiActivity,
@@ -103,8 +104,8 @@ export default function AdminPayments() {
 
     const loadPayments = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/admin/payments', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetch(`${API_BASE_URL}/api/admin/payments`, {
+                headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
             });
             if (res.ok) {
                 const data = await res.json();

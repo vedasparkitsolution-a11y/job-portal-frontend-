@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { 
     FiPlus, FiEdit2, FiTrash2, FiCheck, FiSettings, FiBriefcase, FiTag,
     FiSave, FiUsers, FiStar, FiDatabase, FiCreditCard, FiActivity, FiShield,
@@ -49,6 +50,7 @@ const CANDIDATE_FEATURE_PRESETS = [
 
 export default function AdminPremiumPlans() {
     const { token } = useAuth();
+    const activeToken = token || localStorage.getItem('token') || '';
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -201,7 +203,7 @@ export default function AdminPremiumPlans() {
     // ── 1. Fetch Dynamic Plans ──
     const fetchPlans = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/plans');
+            const res = await fetch(`${API_BASE_URL}/api/plans`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
@@ -216,7 +218,7 @@ export default function AdminPremiumPlans() {
     // ── 2. Other Auxiliary Data ──
     const fetchOffers = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/subscriptions/offers');
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/offers`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) setOffers(data);
@@ -226,8 +228,8 @@ export default function AdminPremiumPlans() {
 
     const fetchMentors = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/mentors/all', {
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+            const res = await fetch(`${API_BASE_URL}/api/mentors/all`, {
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -238,8 +240,8 @@ export default function AdminPremiumPlans() {
 
     const fetchMentorRequests = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/mentors/requests', {
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+            const res = await fetch(`${API_BASE_URL}/api/mentors/requests`, {
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -250,8 +252,8 @@ export default function AdminPremiumPlans() {
 
     const fetchSubscriptions = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/subscriptions/active-list', {
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/active-list`, {
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -262,8 +264,8 @@ export default function AdminPremiumPlans() {
 
     const fetchAuditLogs = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/admin/audit-logs', {
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+            const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs`, {
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -425,8 +427,8 @@ export default function AdminPremiumPlans() {
 
         try {
             const url = editingPlan
-                ? `http://localhost:5000/api/plans/${editingPlan.id}`
-                : 'http://localhost:5000/api/plans';
+                ? `${API_BASE_URL}/api/plans/${editingPlan.id}`
+                : `${API_BASE_URL}/api/plans`;
             const method = editingPlan ? 'PUT' : 'POST';
 
             const payload = {
@@ -440,7 +442,7 @@ export default function AdminPremiumPlans() {
                 method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || 'mock_token_admin'}`
+                    'Authorization': `Bearer ${activeToken || 'mock_token_admin'}`
                 },
                 body: JSON.stringify(payload)
             });
@@ -465,9 +467,9 @@ export default function AdminPremiumPlans() {
         if (!window.confirm(`Are you sure you want to permanently delete plan "${planName}"? This action cannot be undone.`)) return;
 
         try {
-            const res = await fetch(`http://localhost:5000/api/plans/${planId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/plans/${planId}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
 
             if (!res.ok) {
@@ -487,9 +489,9 @@ export default function AdminPremiumPlans() {
     // ── Duplicate Plan ──
     const handleDuplicatePlan = async (planId, planName) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/plans/${planId}/duplicate`, {
+            const res = await fetch(`${API_BASE_URL}/api/plans/${planId}/duplicate`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+                headers: { 'Authorization': `Bearer ${activeToken || 'mock_token_admin'}` }
             });
 
             if (!res.ok) throw new Error('Failed to duplicate plan');
@@ -506,11 +508,11 @@ export default function AdminPremiumPlans() {
     const handleToggleStatus = async (plan) => {
         const nextStatus = plan.status === 'active' ? 'inactive' : 'active';
         try {
-            const res = await fetch(`http://localhost:5000/api/plans/${plan.id}/status`, {
+            const res = await fetch(`${API_BASE_URL}/api/plans/${plan.id}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || 'mock_token_admin'}`
+                    'Authorization': `Bearer ${activeToken || 'mock_token_admin'}`
                 },
                 body: JSON.stringify({ status: nextStatus })
             });

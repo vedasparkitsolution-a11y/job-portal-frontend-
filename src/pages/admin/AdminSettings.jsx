@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/Toast';
@@ -323,8 +324,8 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setLoading(true);
-            const res = await fetch('http://localhost:5000/api/settings/all', {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            const res = await fetch(`${API_BASE_URL}/api/settings/all`, {
+                headers: (token || localStorage.getItem('token')) ? { Authorization: `Bearer ${token || localStorage.getItem('token')}` } : {}
             });
             if (res.ok) {
                 const data = await res.json();
@@ -350,11 +351,11 @@ export default function AdminSettings() {
         if (e) e.preventDefault();
         setSaving(true);
         try {
-            const res = await fetch('http://localhost:5000/api/settings/all', {
+            const res = await fetch(`${API_BASE_URL}/api/settings/all`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${token || localStorage.getItem('token') || ''}`
                 },
                 body: JSON.stringify(settings)
             });
@@ -378,11 +379,11 @@ export default function AdminSettings() {
         }
         setTestingEmail(true);
         try {
-            const res = await fetch('http://localhost:5000/api/settings/test-email', {
+            const res = await fetch(`${API_BASE_URL}/api/settings/test-email`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${token || localStorage.getItem('token') || ''}`
                 },
                 body: JSON.stringify({
                     testEmail: testEmailAddress,
@@ -408,11 +409,11 @@ export default function AdminSettings() {
     const handleTriggerCron = async (cronKey, cronName) => {
         setCronExecuting(prev => ({ ...prev, [cronKey]: true }));
         try {
-            const res = await fetch('http://localhost:5000/api/settings/trigger-cron', {
+            const res = await fetch(`${API_BASE_URL}/api/settings/trigger-cron`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${token || localStorage.getItem('token') || ''}`
                 },
                 body: JSON.stringify({ cronKey, cronName })
             });
@@ -2385,7 +2386,7 @@ export default function AdminSettings() {
                                                         'Hyderabad': { lat: 17.3850, lng: 78.4867 }
                                                     }[c];
                                                     try {
-                                                        const res = await fetch(`http://localhost:5000/api/jobs/nearby?lat=${coords.lat}&lng=${coords.lng}&radius=${simRadius}`);
+                                                        const res = await fetch(`${API_BASE_URL}/api/jobs/nearby?lat=${coords.lat}&lng=${coords.lng}&radius=${simRadius}`);
                                                         const data = await res.json();
                                                         setSimJobsFound(data.jobs || []);
                                                     } catch (e) {

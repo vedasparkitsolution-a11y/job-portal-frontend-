@@ -4,6 +4,7 @@ import {
     FiSmartphone, FiShield, FiCreditCard, FiZap, FiArrowRight, FiRefreshCw 
 } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 
 export default function PremiumPaymentModal({ 
     isOpen = true, 
@@ -67,11 +68,11 @@ export default function PremiumPaymentModal({
     const processPaymentVerification = async (paymentId = null, orderId = null, signature = null) => {
         setPaymentState('scanning');
         try {
-            const verifyRes = await fetch('http://localhost:5000/api/subscriptions/verify-payment', {
+            const verifyRes = await fetch(`${API_BASE_URL}/api/subscriptions/verify-payment`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || 'mock_token_admin'}`
+                    'Authorization': `Bearer ${token || localStorage.getItem('token') || 'mock_token_admin'}`
                 },
                 body: JSON.stringify({
                     razorpay_order_id: orderId || orderData?.order?.id || 'order_mock_' + Date.now(),

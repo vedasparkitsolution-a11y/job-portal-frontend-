@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config/api';
 import { 
     FiSearch, FiCheckCircle, FiXCircle, FiSlash, FiMail, FiPhone,
     FiSend, FiShield, FiStar, FiFilter, FiBriefcase, FiDollarSign,
@@ -177,8 +178,8 @@ export default function ManageCompanies() {
 
     const loadEmployers = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/admin/users', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -275,11 +276,11 @@ export default function ManageCompanies() {
     const handleToggleApprovedAccess = async (emp) => {
         const newStatus = !emp.approved_access;
         try {
-            await fetch(`http://localhost:5000/api/admin/companies/${emp.id || emp.company_id}/approved-access`, {
+            await fetch(`${API_BASE_URL}/api/admin/companies/${emp.id || emp.company_id}/approved-access`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
                 },
                 body: JSON.stringify({ approved_access: newStatus })
             });

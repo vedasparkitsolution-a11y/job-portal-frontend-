@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { 
     FiBell, FiSend, FiUsers, FiBriefcase, FiPlus, FiTrash2, FiSearch,
     FiFilter, FiCheckCircle, FiAlertTriangle, FiInfo, FiTag, FiClock,
@@ -130,8 +131,8 @@ export default function AdminNotifications() {
     const fetchNotifications = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/admin/notifications', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetch(`${API_BASE_URL}/api/admin/notifications`, {
+                headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -164,11 +165,11 @@ export default function AdminNotifications() {
         if (!composeForm.message.trim()) return toastError('Message content is required');
 
         try {
-            const res = await fetch('http://localhost:5000/api/admin/notifications', {
+            const res = await fetch(`${API_BASE_URL}/api/admin/notifications`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
                 },
                 body: JSON.stringify(composeForm)
             });
@@ -190,9 +191,9 @@ export default function AdminNotifications() {
         if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
 
         try {
-            const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/api/admin/notifications/${id}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
             });
             if (res.ok) {
                 toastSuccess('Notification removed successfully');

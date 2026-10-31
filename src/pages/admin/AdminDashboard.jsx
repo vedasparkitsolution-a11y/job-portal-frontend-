@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
     FiUsers, FiBriefcase, FiFileText, FiShield, FiCheckCircle, FiClock,
@@ -36,13 +37,13 @@ export default function AdminDashboard() {
     async function loadDashboardData() {
         try {
             const [summaryRes, usersRes, jobsRes] = await Promise.all([
-                fetch('http://localhost:5000/api/admin/analytics-summary', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                fetch(`${API_BASE_URL}/api/admin/analytics-summary`, {
+                    headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
                 }).catch(() => null),
-                fetch('http://localhost:5000/api/admin/users', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                fetch(`${API_BASE_URL}/api/admin/users`, {
+                    headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}` }
                 }).catch(() => null),
-                fetch('http://localhost:5000/api/jobs').catch(() => null)
+                fetch(`${API_BASE_URL}/api/jobs`).catch(() => null)
             ]);
 
             if (summaryRes && summaryRes.ok) {

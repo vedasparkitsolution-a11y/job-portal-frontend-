@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import PremiumPaymentModal from '../../components/company/PremiumPaymentModal';
 import { FiBriefcase, FiDatabase, FiDownload, FiCheck, FiStar, FiSend, FiX, FiCheckCircle, FiShield, FiZap, FiChevronRight } from 'react-icons/fi';
@@ -37,9 +38,9 @@ export default function SubscriptionPlans() {
         setLoading(true);
         try {
             const [plansRes, statusRes] = await Promise.all([
-                fetch('http://localhost:5000/api/plans?plan_type=employer&status=active').catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/status', {
-                    headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
+                fetch(`${API_BASE_URL}/api/plans?plan_type=employer&status=active`).catch(() => null),
+                fetch(`${API_BASE_URL}/api/subscriptions/status`, {
+                    headers: { 'Authorization': `Bearer ${token || localStorage.getItem('token') || 'mock_token_admin'}` }
                 }).catch(() => null)
             ]);
 
@@ -66,11 +67,11 @@ export default function SubscriptionPlans() {
     const handleUpgrade = async (plan) => {
         setProcessing(true);
         try {
-            const orderRes = await fetch('http://localhost:5000/api/subscriptions/create-order', {
+            const orderRes = await fetch(`${API_BASE_URL}/api/subscriptions/create-order`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || 'mock_token_admin'}`
+                    'Authorization': `Bearer ${token || localStorage.getItem('token') || 'mock_token_admin'}`
                 },
                 body: JSON.stringify({ 
                     planId: plan.id,

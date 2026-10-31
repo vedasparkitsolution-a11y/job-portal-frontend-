@@ -149,8 +149,11 @@ router.post('/', verifyToken, verifyRole(['admin']), (req, res) => {
         return res.status(400).json({ message: 'Plan name is required.' });
     }
 
-    const origPrice = Math.max(0, Number(original_price) || 0);
-    const offPrice = Math.max(0, Number(offer_price !== undefined ? offer_price : origPrice));
+    let origPrice = Math.max(0, Number(original_price) || 0);
+    let offPrice = Math.max(0, Number(offer_price !== undefined && offer_price !== '' ? offer_price : origPrice));
+    if (origPrice === 0 && offPrice > 0) {
+        origPrice = offPrice;
+    }
 
     if (offPrice > origPrice && origPrice > 0) {
         return res.status(400).json({ message: 'Offer price cannot be greater than original price.' });
@@ -244,8 +247,11 @@ router.put('/:id', verifyToken, verifyRole(['admin']), (req, res) => {
         return res.status(400).json({ message: 'Plan name is required.' });
     }
 
-    const origPrice = Math.max(0, Number(original_price) || 0);
-    const offPrice = Math.max(0, Number(offer_price !== undefined ? offer_price : origPrice));
+    let origPrice = Math.max(0, Number(original_price) || 0);
+    let offPrice = Math.max(0, Number(offer_price !== undefined && offer_price !== '' ? offer_price : origPrice));
+    if (origPrice === 0 && offPrice > 0) {
+        origPrice = offPrice;
+    }
 
     let discountPercentage = 0;
     if (origPrice > 0 && offPrice < origPrice) {

@@ -67,27 +67,40 @@ export default function SubscriptionPlans() {
     const handleUpgrade = async (plan) => {
         setProcessing(true);
         try {
-            const orderRes = await fetch(`${API_BASE_URL}/api/subscriptions/create-order`, {
+            const tokenToUse = token || localStorage.getItem('token') || 'mock_token_admin';
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/activate-instant`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || localStorage.getItem('token') || 'mock_token_admin'}`
+                    'Authorization': `Bearer ${tokenToUse}`
                 },
                 body: JSON.stringify({ 
                     planId: plan.id,
                     targetRole: 'employer'
                 })
             });
-            const orderData = await orderRes.json();
+            const data = await res.json();
             
-            if (!orderRes.ok) throw new Error(orderData.message || 'Failed to create order');
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to activate plan');
+            }
 
-            // Open UPI QR Scanner & Payment Modal
-            setMockPaymentData({ plan, orderData });
-            setProcessing(false);
+            if (addToast) {
+                addToast({
+                    type: 'success',
+                    title: 'Subscription Activated',
+                    message: data.message || `Plan ${plan.plan_name} activated successfully!`
+                });
+            } else {
+                alert(data.message || `Plan ${plan.plan_name} activated successfully!`);
+            }
+
+            // Immediately re-fetch plans and active subscription status
+            await fetchPlansAndStatus();
         } catch (error) {
-            console.error('Checkout error:', error);
-            alert('Failed to initiate payment: ' + error.message);
+            console.error('Activation error:', error);
+            alert('Failed to activate plan: ' + error.message);
+        } finally {
             setProcessing(false);
         }
     };

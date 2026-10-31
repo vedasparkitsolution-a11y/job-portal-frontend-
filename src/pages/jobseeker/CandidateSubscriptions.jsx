@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import CandidateSidebar from '../../components/CandidateSidebar';
 import PremiumPaymentModal from '../../components/company/PremiumPaymentModal';
@@ -130,9 +131,9 @@ export default function CandidateSubscriptions() {
         setLoading(true);
         try {
             const [plansRes, offersRes, perksRes] = await Promise.all([
-                fetch('http://localhost:5000/api/plans?plan_type=candidate&status=active').catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/offers').catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/candidate-perks', {
+                fetch(`${API_BASE_URL}/api/plans?plan_type=candidate&status=active`).catch(() => null),
+                fetch(`${API_BASE_URL}/api/subscriptions/offers`).catch(() => null),
+                fetch(`${API_BASE_URL}/api/subscriptions/candidate-perks`, {
                     headers: { 'Authorization': `Bearer ${token || 'mock_token_admin'}` }
                 }).catch(() => null)
             ]);
@@ -196,7 +197,7 @@ export default function CandidateSubscriptions() {
         // Free plan instant activation
         if (Number(finalPrice) === 0) {
             try {
-                const res = await fetch('http://localhost:5000/api/subscriptions/verify-payment', {
+                const res = await fetch(`${API_BASE_URL}/api/subscriptions/verify-payment`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -227,7 +228,7 @@ export default function CandidateSubscriptions() {
         // Paid plan order creation
         let orderData = null;
         try {
-            const orderRes = await fetch('http://localhost:5000/api/subscriptions/create-order', {
+            const orderRes = await fetch(`${API_BASE_URL}/api/subscriptions/create-order`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

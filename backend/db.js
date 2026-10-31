@@ -53,14 +53,21 @@ function normalizePgRow(row) {
             row.jobId = val;
         } else if (lower === 'jobtype') {
             row.jobType = val;
+        } else if (lower === 'planid') {
+            row.planId = val;
+        } else if (lower === 'employername') {
+            row.employerName = val;
+        } else if (lower === 'useremail') {
+            row.userEmail = val;
         }
     }
     return new Proxy(row, {
         get(target, prop, receiver) {
             if (typeof prop === 'string') {
-                if (prop in target) return target[prop];
+                if (target[prop] !== undefined && target[prop] !== null) return target[prop];
                 const lower = prop.toLowerCase();
-                if (lower in target) return target[lower];
+                if (target[lower] !== undefined && target[lower] !== null) return target[lower];
+                if (prop in target) return target[prop];
             }
             return Reflect.get(target, prop, receiver);
         }

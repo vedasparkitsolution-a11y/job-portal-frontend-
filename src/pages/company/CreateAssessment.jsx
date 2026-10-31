@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 
 const CreateAssessment = () => {
   const [formData, setFormData] = useState({
@@ -45,7 +46,7 @@ const CreateAssessment = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/assessments/create', {
+      const response = await fetch(`${API_BASE_URL}/api/assessments/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

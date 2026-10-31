@@ -5,6 +5,7 @@ import { getApplicationsByJob, updateApplicationStatus } from '../../services/ap
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import {
     FiArrowLeft, FiDownload, FiUsers, FiFilter,
     FiCalendar, FiEye, FiSearch, FiCheck, FiVideo,
@@ -54,7 +55,7 @@ export default function ViewApplicants() {
             const [jobData, apps, quotaRes] = await Promise.all([
                 getJob(jobId),
                 getApplicationsByJob(jobId),
-                fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+                fetch(`${API_BASE_URL}/api/subscriptions/employer-quota`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 }).catch(() => null)
             ]);
@@ -122,7 +123,7 @@ export default function ViewApplicants() {
         setUnlockingId(targetCandId);
         try {
             const authToken = token || localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/employer/unlock-contact', {
+            const res = await fetch(`${API_BASE_URL}/api/employer/unlock-contact`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

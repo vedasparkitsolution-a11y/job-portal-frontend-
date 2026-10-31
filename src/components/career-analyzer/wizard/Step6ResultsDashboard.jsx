@@ -11,6 +11,7 @@ import { getJobRecommendations, generateSkillGap } from '../../../utils/career-a
 import { sendProfileSubmissionEmail, isEmailConfigured } from '../../../utils/career-analyzer/emailService';
 import { triggerAutomation } from '../../../utils/career-analyzer/automationService';
 import { getJobPortalLinks } from '../../../utils/career-analyzer/jobPortalLinks';
+import { API_BASE_URL } from '../../../config/api';
 
 const Step6ResultsDashboard = ({ formData }) => {
     const [loading, setLoading] = useState(true);
@@ -123,7 +124,7 @@ const Step6ResultsDashboard = ({ formData }) => {
         saveAndAnalyze();
         
         // Fetch candidate subscription plan
-        fetch('http://localhost:5000/api/subscriptions/plans')
+        fetch('/api/subscriptions/plans')
             .then(res => res.json())
             .then(plans => {
                 const plan = plans.find(p => p.role === 'jobseeker');

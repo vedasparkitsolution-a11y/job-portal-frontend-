@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { getOpenJobs } from '../../services/jobService';
 import { getApplicationsByUser } from '../../services/applicationService';
 import JobCard from '../../components/JobCard';
@@ -92,10 +93,10 @@ export default function JobSeekerDashboard() {
             const [jobs, apps, perksRes, plansRes] = await Promise.all([
                 getOpenJobs().catch(() => []),
                 getApplicationsByUser(uid).catch(() => []),
-                fetch('http://localhost:5000/api/subscriptions/candidate-perks', {
+                fetch(`${API_BASE_URL}/api/subscriptions/candidate-perks`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/candidate-plans').catch(() => null)
+                fetch(`${API_BASE_URL}/api/subscriptions/candidate-plans`).catch(() => null)
             ]);
 
             setRecentJobs(Array.isArray(jobs) ? jobs : []);
@@ -141,7 +142,7 @@ export default function JobSeekerDashboard() {
         e.preventDefault();
         setSubmittingRequest(true);
         try {
-            const res = await fetch('http://localhost:5000/api/mentors/requests', {
+            const res = await fetch(`${API_BASE_URL}/api/mentors/requests`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

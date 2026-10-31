@@ -1118,6 +1118,125 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
     }
 });
 
+// 16.5 Instant 1-Click Plan Activation (Testing / Direct Activation)
+router.post('/activate-instant', verifyToken, async (req, res) => {
+    const { planId, targetRole = 'employer' } = req.body || {};
+    if (!planId) return res.status(400).json({ message: 'Plan ID is required for activation' });
+
+    try {
+        const userId = req.user.id;
+        const userEmail = req.user.email || '';
+
+        // Query user and employer records to ensure complete company and contact metadata
+        const userRecord = await new Promise(resolve => {
+            db.get('SELECT * FROM users WHERE id = ? OR email = ?', [userId, userEmail], (err, row) => resolve(row || null));
+        });
+        const employerRecord = await new Promise(resolve => {
+            db.get('SELECT * FROM employers WHERE email = ? OR employer_id = ?', [userEmail, `emp_${userId}`], (err, row) => resolve(row || null));
+        });
+
+        const userName = userRecord?.hrName || userRecord?.name || req.user.name || (userEmail ? userEmail.split('@')[0] : 'Employer');
+        const userCompany = userRecord?.companyName || req.user.companyName || 'Company';
+        const companyId = employerRecord?.company_id || userRecord?.company_id || `comp_${userId}`;
+
+        // Check unified plans table first
+        let plan = await new Promise((resolve) => {
+            db.get('SELECT * FROM plans WHERE id = ?', [planId], (err, row) => resolve(row));
+        });
+
+        // Check legacy subscription_plans if not found
+        if (!plan) {
+            plan = await new Promise((resolve) => {
+                db.get('SELECT * FROM subscription_plans WHERE id = ?', [planId], (err, row) => resolve(row));
+            });
+        }
+
+        if (!plan) {
+            return res.status(404).json({ message: 'Selected subscription plan not found' });
+        }
+
+        const planName = plan.plan_name || plan.name || 'Subscription Plan';
+        const finalPrice = plan.offer_price !== undefined && plan.offer_price !== null ? plan.offer_price : (plan.original_price || plan.price || 0);
+        const days = plan.duration_days || (plan.duration_months ? plan.duration_months * 30 : 30);
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + Number(days));
+        const formattedExpiry = expiryDate.toISOString().slice(0, 19).replace('T', ' ');
+
+        // Record payment in payments table
+        db.run(
+            `INSERT INTO payments (userId, planId, razorpayOrderId, razorpayPaymentId, amount, status) VALUES (?, ?, ?, ?, ?, 'success')`,
+            [userId, plan.id, 'instant_order_' + Date.now(), 'pay_instant_' + Date.now(), finalPrice],
+            () => {}
+        );
+
+        if (targetRole === 'candidate' || plan.plan_type === 'candidate') {
+            db.run(
+                `INSERT INTO candidate_subscriptions (
+                    candidate_id, candidate_email, candidate_name, plan_id, plan_name,
+                    amount_paid, application_limit, end_date, payment_status, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'active')`,
+                [userId, userEmail, userName, plan.id, planName, finalPrice, plan.posting_limit || 10, formattedExpiry],
+                function (err) {
+                    if (err) return res.status(500).json({ message: 'Error activating candidate subscription: ' + err.message });
+                    db.run('UPDATE users SET isPremium = 1 WHERE id = ?', [userId]);
+                    return res.json({
+                        success: true,
+                        message: `🎉 Plan "${planName}" activated successfully!`,
+                        expiryDate: formattedExpiry,
+                        planName,
+                        application_limit: plan.posting_limit || 10
+                    });
+                }
+            );
+        } else {
+            // Supersede older active subscriptions for this employer/user
+            db.run(
+                `UPDATE subscriptions SET status = 'superseded', updatedAt = CURRENT_TIMESTAMP 
+                 WHERE (userId = ? OR userEmail = ? OR companyId = ?) AND status = 'active'`,
+                [userId, userEmail, companyId]
+            );
+
+            // Record employer subscription with all tracking fields initialized
+            db.run(
+                `INSERT INTO subscriptions (
+                    userId, companyId, companyName, employerName, userEmail, planId, target_role, plan_type, amount,
+                    payment_status, status, startDate, expiryDate, jobsUsed, contactsViewed, resumeDownloads
+                ) VALUES (?, ?, ?, ?, ?, ?, 'employer', 'common', ?, 'paid', 'active', CURRENT_TIMESTAMP, ?, 0, 0, 0)`,
+                [userId, companyId, userCompany, userName, userEmail, plan.id, finalPrice, formattedExpiry],
+                function (err) {
+                    if (err) {
+                        console.error('Error activating employer subscription:', err);
+                        return res.status(500).json({ message: 'Error activating employer subscription: ' + err.message });
+                    }
+                    db.run('UPDATE users SET isPremium = 1 WHERE id = ?', [userId]);
+
+                    recordAuditLog(
+                        req.user,
+                        'ACTIVATE_PLAN_INSTANT',
+                        'subscriptions',
+                        plan.id,
+                        planName,
+                        `Instantly activated "${planName}" for ${userCompany} (${userEmail})`,
+                        { planId: plan.id, planName, userId, companyId, formattedExpiry }
+                    );
+
+                    return res.json({
+                        success: true,
+                        message: `🎉 Plan "${planName}" activated successfully!`,
+                        expiryDate: formattedExpiry,
+                        planName,
+                        posting_limit: plan.posting_limit !== undefined ? plan.posting_limit : plan.job_limit,
+                        candidate_views_limit: plan.candidate_views_limit !== undefined ? plan.candidate_views_limit : plan.contact_views
+                    });
+                }
+            );
+        }
+    } catch (e) {
+        console.error('Instant activation error:', e);
+        res.status(500).json({ message: 'Instant activation failed: ' + e.message });
+    }
+});
+
 // 17. Current User Subscription Status
 router.get('/status', verifyToken, (req, res) => {
     const userId = req.user.id;

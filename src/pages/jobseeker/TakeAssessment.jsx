@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
+import { API_BASE_URL } from '../../config/api';
 
 const TakeAssessment = () => {
   const { id } = useParams();
@@ -36,7 +37,7 @@ const TakeAssessment = () => {
 
   const fetchAssessmentDetails = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/assessments/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assessments/${id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {
@@ -122,7 +123,7 @@ const TakeAssessment = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/assessments/submit', {
+      const response = await fetch(`${API_BASE_URL}/api/assessments/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

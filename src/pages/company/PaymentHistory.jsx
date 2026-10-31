@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { API_BASE_URL } from '../../config/api';
 import { FiFileText, FiCheckCircle } from 'react-icons/fi';
 
 export default function PaymentHistory() {
@@ -14,7 +15,7 @@ export default function PaymentHistory() {
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/subscriptions/history', {
+            const res = await fetch(`${API_BASE_URL}/api/subscriptions/history`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();

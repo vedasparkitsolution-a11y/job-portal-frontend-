@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useToast } from '../../components/Toast';
+import { API_BASE_URL } from '../../config/api';
 import { FiLock, FiUnlock, FiMail, FiPhone, FiMapPin, FiBriefcase, FiBook, FiStar, FiFileText, FiDownload, FiCheckCircle } from 'react-icons/fi';
 
 export default function CandidateMatches() {
@@ -21,10 +22,10 @@ export default function CandidateMatches() {
     const fetchMatchesAndQuota = async () => {
         try {
             const [candRes, quotaRes] = await Promise.all([
-                fetch('http://localhost:5000/api/employer/matched-candidates', {
+                fetch(`${API_BASE_URL}/api/employer/matched-candidates`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(() => null),
-                fetch('http://localhost:5000/api/subscriptions/employer-quota', {
+                fetch(`${API_BASE_URL}/api/subscriptions/employer-quota`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(() => null)
             ]);
@@ -48,7 +49,7 @@ export default function CandidateMatches() {
     const handleUnlock = async (candidateId) => {
         setUnlocking(true);
         try {
-            const res = await fetch('http://localhost:5000/api/employer/unlock-contact', {
+            const res = await fetch(`${API_BASE_URL}/api/employer/unlock-contact`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

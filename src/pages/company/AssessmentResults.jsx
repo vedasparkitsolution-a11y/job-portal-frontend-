@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config/api';
 
 const AssessmentResults = () => {
   const { id } = useParams();
@@ -13,7 +14,7 @@ const AssessmentResults = () => {
 
   const fetchResults = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/assessments/results/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assessments/results/${id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {

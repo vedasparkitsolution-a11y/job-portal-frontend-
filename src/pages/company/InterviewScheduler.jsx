@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiCalendar, FiClock, FiUser, FiBriefcase, FiTrash2, FiMail } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function InterviewScheduler() {
@@ -16,7 +17,7 @@ export default function InterviewScheduler() {
 
     async function fetchInterviews() {
         try {
-            const res = await fetch('http://localhost:5000/api/interviews', {
+            const res = await fetch(`${API_BASE_URL}/api/interviews`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -32,7 +33,7 @@ export default function InterviewScheduler() {
 
     async function deleteInterview(id) {
         try {
-            const res = await fetch(`http://localhost:5000/api/interviews/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/api/interviews/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

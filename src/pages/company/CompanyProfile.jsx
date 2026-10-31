@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateCompanyProfile } from '../../services/companyService';
 import { uploadLogo } from '../../services/storageService';
+import { API_BASE_URL } from '../../config/api';
 import { FiSave, FiImage, FiBriefcase, FiUser, FiSmartphone, FiCheckCircle, FiLock } from 'react-icons/fi';
 import EmployerLoginModal from '../../components/company/EmployerLoginModal';
 
@@ -75,7 +76,7 @@ export default function CompanyProfile({ embedded = false }) {
 
             // Sync with backend API
             if (currentUser) {
-                await fetch('http://localhost:5000/api/employer/profile', {
+                await fetch(`${API_BASE_URL}/api/employer/profile`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',

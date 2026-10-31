@@ -86,13 +86,9 @@ export default function SubscriptionPlans() {
             }
 
             if (addToast) {
-                addToast({
-                    type: 'success',
-                    title: 'Subscription Activated',
-                    message: data.message || `Plan ${plan.plan_name} activated successfully!`
-                });
+                addToast(data.message || `🎉 Plan "${plan.plan_name}" activated successfully!`, 'success');
             } else {
-                alert(data.message || `Plan ${plan.plan_name} activated successfully!`);
+                alert(data.message || `🎉 Plan "${plan.plan_name}" activated successfully!`);
             }
 
             // Immediately re-fetch plans and active subscription status

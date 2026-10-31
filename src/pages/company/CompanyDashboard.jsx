@@ -405,7 +405,7 @@ export default function CompanyDashboard() {
                         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
                         gap: '20px'
                     }}>
-                        {employerPlans.slice(0, 3).map((plan) => {
+                        {(Array.isArray(employerPlans) ? employerPlans : []).slice(0, 3).map((plan) => {
                             const isCurrentActive = Boolean(subscription?.hasActiveSubscription && (
                                 String(subscription.subscription?.planId) === String(plan.id) ||
                                 (subscription.subscription?.planName && plan.name && subscription.subscription.planName.trim().toLowerCase() === plan.name.trim().toLowerCase())
@@ -468,7 +468,7 @@ export default function CompanyDashboard() {
                                     </div>
 
                                     <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {featuresList.map((feat, idx) => (
+                                        {(Array.isArray(featuresList) ? featuresList : []).map((feat, idx) => (
                                             <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155' }}>
                                                 <FiCheck style={{ color: '#16a34a', flexShrink: 0 }} />
                                                 <span>{feat}</span>
@@ -512,9 +512,9 @@ export default function CompanyDashboard() {
                             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Recent Postings</h3>
                             <Link to="/company/manage-jobs" style={{ fontSize: '0.85rem', color: '#7c3aed', fontWeight: 700, textDecoration: 'none' }}>View All →</Link>
                         </div>
-                        {recentJobs.length === 0 ? <p style={{ color: '#94a3b8' }}>No jobs posted yet.</p> : (
+                        {(!Array.isArray(recentJobs) || recentJobs.length === 0) ? <p style={{ color: '#94a3b8' }}>No jobs posted yet.</p> : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {recentJobs.map(job => (
+                                {(Array.isArray(recentJobs) ? recentJobs : []).map(job => (
                                     <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9' }}>
                                         <div>
                                             <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>{job.title}</div>
@@ -535,9 +535,9 @@ export default function CompanyDashboard() {
                             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Latest Applicants</h3>
                             <Link to="/company/applicants" style={{ fontSize: '0.85rem', color: '#7c3aed', fontWeight: 700, textDecoration: 'none' }}>View All →</Link>
                         </div>
-                        {recentApps.length === 0 ? <p style={{ color: '#94a3b8' }}>No applicants yet.</p> : (
+                        {(!Array.isArray(recentApps) || recentApps.length === 0) ? <p style={{ color: '#94a3b8' }}>No applicants yet.</p> : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {recentApps.map(app => (
+                                {(Array.isArray(recentApps) ? recentApps : []).map(app => (
                                     <div key={app.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9' }}>
                                         <div>
                                             <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>{app.applicantName || 'Candidate'}</div>

@@ -32,7 +32,9 @@ export default function CandidateMatches() {
 
             if (candRes && candRes.ok) {
                 const data = await candRes.json();
-                setCandidates(data);
+                setCandidates(Array.isArray(data) ? data : []);
+            } else {
+                setCandidates([]);
             }
             if (quotaRes && quotaRes.ok) {
                 const qData = await quotaRes.json();
@@ -154,13 +156,13 @@ export default function CandidateMatches() {
                 </div>
             )}
 
-            {candidates.length === 0 ? (
+            {(!Array.isArray(candidates) || candidates.length === 0) ? (
                 <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
                     <p style={{ color: '#64748b', fontSize: '1.1rem' }}>No candidates match your current job postings yet.</p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '22px' }}>
-                    {candidates.map(candidate => (
+                    {(Array.isArray(candidates) ? candidates : []).map(candidate => (
                         <div key={candidate.id} style={{
                             background: '#fff',
                             borderRadius: '18px',

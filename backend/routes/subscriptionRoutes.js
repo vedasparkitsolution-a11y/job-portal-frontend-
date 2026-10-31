@@ -1755,14 +1755,22 @@ router.post('/candidate-subscribe', verifyToken, (req, res) => {
 // 22. Payment History
 router.get('/history', verifyToken, (req, res) => {
     const query = `
-        SELECT py.*, p.name as planName 
+        SELECT py.*, 
+               COALESCE(p1.plan_name, p2.name, 'Subscription Plan') as planName,
+               COALESCE(py.created_at, py.createdAt, CURRENT_TIMESTAMP) as createdAt,
+               COALESCE(py.razorpayorderid, py.order_id, 'N/A') as razorpayOrderId,
+               COALESCE(py.razorpaypaymentid, py.payment_id, 'N/A') as razorpayPaymentId
         FROM payments py
-        JOIN subscription_plans p ON py.planId = p.id
+        LEFT JOIN plans p1 ON py.planId = p1.id
+        LEFT JOIN subscription_plans p2 ON py.planId = p2.id
         WHERE py.userId = ?
-        ORDER BY py.createdAt DESC
+        ORDER BY py.id DESC
     `;
     db.all(query, [req.user.id], (err, payments) => {
-        if (err) return res.status(500).json({ message: 'Error fetching payment history' });
+        if (err) {
+            console.error('Error fetching payments:', err);
+            return res.json([]);
+        }
         res.json(payments || []);
     });
 });

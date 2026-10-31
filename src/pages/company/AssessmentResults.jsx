@@ -19,14 +19,19 @@ const AssessmentResults = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setResults(data);
+        setResults(Array.isArray(data) ? data : []);
+      } else {
+        setResults([]);
       }
     } catch (error) {
       console.error('Error fetching results', error);
+      setResults([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const safeResults = Array.isArray(results) ? results : [];
 
   return (
     <div className="dashboard-container">
@@ -37,7 +42,7 @@ const AssessmentResults = () => {
 
       {loading ? (
         <div className="loading-spinner">Loading...</div>
-      ) : results.length === 0 ? (
+      ) : safeResults.length === 0 ? (
         <div className="empty-state">
           <p>No candidates have taken this assessment yet.</p>
         </div>
@@ -53,7 +58,7 @@ const AssessmentResults = () => {
               </tr>
             </thead>
             <tbody>
-              {results.map(result => (
+              {safeResults.map(result => (
                 <tr key={result.id}>
                   <td>{result.candidateEmail}</td>
                   <td>

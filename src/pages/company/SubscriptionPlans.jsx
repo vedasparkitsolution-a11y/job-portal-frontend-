@@ -266,7 +266,11 @@ export default function SubscriptionPlans() {
                         ));
                         const isPopular = Boolean(plan.popular || plan.is_popular);
                         const isRecommended = Boolean(plan.recommended || plan.is_recommended);
-                        const features = plan.features || [];
+                        const features = Array.isArray(plan.features) 
+                            ? plan.features 
+                            : (typeof plan.features === 'string' && plan.features.trim() 
+                                ? plan.features.split('\n').filter(Boolean).map(f => ({ feature_name: f, included: true })) 
+                                : []);
 
                         return (
                             <div
@@ -412,7 +416,7 @@ export default function SubscriptionPlans() {
                                         What's Included:
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {features.map((feat, idx) => (
+                                        {(Array.isArray(features) ? features : []).map((feat, idx) => (
                                             <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.9rem' }}>
                                                 {feat.included ? (
                                                     <span style={{ color: '#10b981', fontWeight: 900, fontSize: '1.15rem', lineHeight: '1.2' }}>✓</span>

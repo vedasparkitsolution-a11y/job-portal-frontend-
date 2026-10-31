@@ -19,9 +19,10 @@ export default function PaymentHistory() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
-            setHistory(data);
+            setHistory(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching payment history:', error);
+            setHistory([]);
         } finally {
             setLoading(false);
         }
@@ -29,12 +30,14 @@ export default function PaymentHistory() {
 
     if (loading) return <LoadingSpinner />;
 
+    const safeHistory = Array.isArray(history) ? history : [];
+
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
             <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Payment History</h1>
             <p style={{ color: '#64748b', marginBottom: '30px' }}>View your past transactions and download invoices.</p>
 
-            {history.length === 0 ? (
+            {safeHistory.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
                     <p style={{ color: '#64748b', fontSize: '1.1rem' }}>No payment history found.</p>
                 </div>
@@ -52,7 +55,7 @@ export default function PaymentHistory() {
                             </tr>
                         </thead>
                         <tbody>
-                            {history.map(payment => (
+                            {safeHistory.map(payment => (
                                 <tr key={payment.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                     <td style={{ padding: '16px 20px', color: '#1e293b' }}>
                                         {new Date(payment.createdAt).toLocaleDateString()}

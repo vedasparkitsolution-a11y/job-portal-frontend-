@@ -22,14 +22,19 @@ const AvailableAssessments = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setAssessments(data);
+        setAssessments(Array.isArray(data) ? data : []);
+      } else {
+        setAssessments([]);
       }
     } catch (error) {
       console.error('Error fetching assessments', error);
+      setAssessments([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const safeAssessments = Array.isArray(assessments) ? assessments : [];
 
   return (
     <CandidateSidebar>
@@ -41,7 +46,7 @@ const AvailableAssessments = () => {
 
         {loading ? (
           <div className="loading-spinner">Loading assessments...</div>
-        ) : assessments.length === 0 ? (
+        ) : safeAssessments.length === 0 ? (
           <div className="empty-state" style={{ background: 'white', padding: '40px', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
             <FaLaptopCode size={40} color="#94a3b8" style={{ marginBottom: '12px' }} />
             <h3 style={{ margin: '0 0 4px', color: '#1e293b' }}>No Assessments Available</h3>
@@ -49,7 +54,7 @@ const AvailableAssessments = () => {
           </div>
         ) : (
           <div className="assessments-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-            {assessments.map((test) => (
+            {safeAssessments.map((test) => (
               <div key={test.id} className="assessment-card" style={{ background: 'white', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{test.title}</h3>

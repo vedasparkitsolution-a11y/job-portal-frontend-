@@ -21,7 +21,9 @@ const AssessmentsDashboard = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setAssessments(data);
+        setAssessments(Array.isArray(data) ? data : []);
+      } else {
+        setAssessments([]);
       }
     } catch (error) {
       console.error('Error fetching assessments', error);
@@ -56,7 +58,7 @@ const AssessmentsDashboard = () => {
 
       {loading ? (
         <div className="loading-spinner">Loading...</div>
-      ) : assessments.length === 0 ? (
+      ) : (!Array.isArray(assessments) || assessments.length === 0) ? (
         <div className="empty-state">
           <FaLaptopCode className="empty-icon" />
           <h3>No Assessments Created</h3>
@@ -64,7 +66,7 @@ const AssessmentsDashboard = () => {
         </div>
       ) : (
         <div className="assessment-grid">
-          {assessments.map((test) => (
+          {(Array.isArray(assessments) ? assessments : []).map((test) => (
             <div key={test.id} className="assessment-card">
               <div className="card-header">
                 <h3>{test.title}</h3>

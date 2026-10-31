@@ -22,10 +22,13 @@ export default function InterviewScheduler() {
             });
             if (res.ok) {
                 const data = await res.json();
-                setInterviews(data);
+                setInterviews(Array.isArray(data) ? data : []);
+            } else {
+                setInterviews([]);
             }
         } catch (e) {
             console.error('Error fetching interviews:', e);
+            setInterviews([]);
         } finally {
             setLoading(false);
         }
@@ -38,16 +41,17 @@ export default function InterviewScheduler() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                setInterviews(prev => prev.filter(i => i.id !== id));
+                setInterviews(prev => (Array.isArray(prev) ? prev : []).filter(i => i.id !== id));
             }
         } catch (e) {
             console.error('Error deleting interview:', e);
         }
     }
 
+    const safeInterviews = Array.isArray(interviews) ? interviews : [];
     const now = new Date();
-    const upcoming = interviews.filter(i => new Date(i.date + 'T' + i.time) >= now);
-    const past = interviews.filter(i => new Date(i.date + 'T' + i.time) < now);
+    const upcoming = safeInterviews.filter(i => new Date(i.date + 'T' + i.time) >= now);
+    const past = safeInterviews.filter(i => new Date(i.date + 'T' + i.time) < now);
 
     const InterviewCard = ({ iv, isPast }) => (
         <div style={{
